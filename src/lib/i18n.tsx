@@ -25,8 +25,47 @@ const STORAGE_KEY = "sahakar.lang";
 /* ---------------- Dictionary ---------------- */
 
 type Dict = Record<string, string>;
+import { GW_BN } from "./i18n.bn-gw";
 
 const en: Dict = {
+  gw_op_badge: "Federation live — dispatching now",
+  gw_eyebrow: "Cooperative-owned · Union-governed",
+  gw_title_a: "The artisan federation that works for artisans.",
+  gw_title_b: "0% Commission. 100% Direct Worker Earnings.",
+  gw_sub:
+    "Sahakar Seva is owned and governed by artisan trade unions — electricians, plumbers, carpenters, masons, painters and appliance technicians. We eliminate predatory middleman commissions so every rupee you pay reaches the worker who earned it.",
+  gw_booker_badge: "For customers & households",
+  gw_booker_title: "Continue as Booker",
+  gw_booker_desc:
+    "Book certified electricians, plumbers, carpenters and appliance experts. Pay verified union rates directly to workers with zero platform cut.",
+  gw_booker_h1: "Direct P2P UPI payment to the artisan",
+  gw_booker_h2: "Police & skill verified technicians",
+  gw_booker_h3: "Real-time GPS radar dispatch & live arrival",
+  gw_booker_cta: "Find an artisan",
+  gw_worker_badge: "Most joined",
+  gw_worker_title: "Continue as Artisan",
+  gw_worker_desc:
+    "Keep 100% of your service fee. Join your district cooperative society, receive digital credentials and earn union welfare dividends.",
+  gw_worker_h1: "Zero commission taken on any booking",
+  gw_worker_h2: "Accessible voice-guided trade certification",
+  gw_worker_h3: "Accident insurance, pension pool & welfare fund",
+  gw_worker_cta: "Join & get certified",
+  gw_admin_badge: "Officials only",
+  gw_admin_title: "Continue as Federation Admin",
+  gw_admin_desc:
+    "Official federation portal for district labor officers and society board members to review certifications, manage settlements and audit GIS heatmaps.",
+  gw_admin_h1: "Artisan identity & skill verification queue",
+  gw_admin_h2: "Live district GIS dispatch & demand heatmaps",
+  gw_admin_h3: "Cooperative welfare treasury & dividend audit",
+  gw_admin_cta: "Enter governance console",
+  gw_m1_t: "0% Platform Fee",
+  gw_m1_s: "Retained by artisans",
+  gw_m2_t: "4-Tier Verification",
+  gw_m2_s: "Identity + voice skill quiz",
+  gw_m3_t: "100% Peer-to-Peer UPI",
+  gw_m3_s: "Direct bank settlement",
+  gw_m4_t: "District Co-ops",
+  gw_m4_s: "Democratic union governance",
   nav_tag: "cooperative gig federation",
   signin: "worker sign-in",
   signout: "sign out",
@@ -257,7 +296,50 @@ const en: Dict = {
   ad_cancel: "cancel",
 };
 
+/* Bengali gateway keys live in ./i18n.bn-gw and are merged into the `en`
+   fallback dictionary. Every other language defines its own `gw_*` keys,
+   so these values are only reached when the active language is `bn`. */
+Object.assign(en, GW_BN);
+
 const hi: Dict = {
+  gw_op_badge: "संघ सक्रिय — डिस्पैच जारी",
+  gw_eyebrow: "सहकारी स्वामित्व · संघ-संचालित",
+  gw_title_a: "कारीगरों के लिए कारीगरों का संघ।",
+  gw_title_b: "0% कमीशन। 100% सीधी कमाई कारीगर की।",
+  gw_sub:
+    "सहकार सेवा कारीगर संघों के स्वामित्व और नियंत्रण में चलती है — बिजली मिस्त्री, प्लंबर, बढ़ई, राज मिस्त्री, पेंटर और उपकरण तकनीशियन। हम बिचौलिया कमीशन खत्म करते हैं ताकि आपका हर रुपया उसी मज़दूर तक पहुँचे जिसने कमाया।",
+  gw_booker_badge: "ग्राहकों के लिए",
+  gw_booker_title: "बुकर के रूप में जारी रखें",
+  gw_booker_desc:
+    "प्रमाणित बिजली मिस्त्री, प्लंबर, बढ़ई और उपकरण विशेषज्ञ बुक करें। संघ-निर्धारित दर सीधे कारीगर को चुकाएँ — बीच में कोई कटौती नहीं।",
+  gw_booker_h1: "UPI से सीधे कारीगर के खाते में भुगतान",
+  gw_booker_h2: "पुलिस व कौशल-प्रमाणित तकनीशियन",
+  gw_booker_h3: "रियल-टाइम GPS रडार डिस्पैच और लाइव आगमन",
+  gw_booker_cta: "कारीगर खोजें",
+  gw_worker_badge: "सर्वाधिक जुड़े",
+  gw_worker_title: "कारीगर के रूप में जारी रखें",
+  gw_worker_desc:
+    "अपनी पूरी सर्विस फीस रखें। अपने ज़िले की सहकारी समिति से जुड़ें, डिजिटल प्रमाणपत्र पाएँ और संघ कल्याण लाभांश कमाएँ।",
+  gw_worker_h1: "किसी बुकिंग पर शून्य कमीशन",
+  gw_worker_h2: "आवाज़-आधारित सुलभ ट्रेड प्रमाणन परीक्षा",
+  gw_worker_h3: "दुर्घटना बीमा, पेंशन कोष और कल्याण निधि",
+  gw_worker_cta: "जुड़ें और प्रमाणित हों",
+  gw_admin_badge: "केवल अधिकारी",
+  gw_admin_title: "महासंघ प्रशासक के रूप में जारी रखें",
+  gw_admin_desc:
+    "ज़िला श्रम अधिकारियों और समिति पदाधिकारियों के लिए आधिकारिक पोर्टल — प्रमाणन समीक्षा, भुगतान प्रबंधन और GIS हीटमैप ऑडिट।",
+  gw_admin_h1: "कारीगर पहचान व कौशल सत्यापन कतार",
+  gw_admin_h2: "लाइव ज़िला GIS डिस्पैच और माँग हीटमैप",
+  gw_admin_h3: "सहकारी कल्याण कोष व लाभांश ऑडिट",
+  gw_admin_cta: "प्रशासन कंसोल खोलें",
+  gw_m1_t: "0% प्लेटफ़ॉर्म शुल्क",
+  gw_m1_s: "पूरा कारीगर का",
+  gw_m2_t: "4-स्तरीय सत्यापन",
+  gw_m2_s: "पहचान + वॉइस कौशल क्विज़",
+  gw_m3_t: "100% P2P UPI",
+  gw_m3_s: "सीधा बैंक भुगतान",
+  gw_m4_t: "ज़िला सहकारी समितियाँ",
+  gw_m4_s: "लोकतांत्रिक संघ शासन",
   nav_tag: "सहकारी गिग फेडरेशन",
   signin: "वर्कर साइन-इन",
   signout: "साइन आउट",
@@ -487,7 +569,45 @@ const hi: Dict = {
   ad_cancel: "रद्द",
 };
 
-const te: Dict = {
+const te: Dict = { // federation-gateway-i18n
+  gw_op_badge: "సంఘ సజీవం — డిస్పాచ్ కొనసాగుతోంది",
+  gw_eyebrow: "సహకార యాజమాన్యం · యూనియన్ నిర్వహణ",
+  gw_title_a: "కళాకారుల కోసం కళాకారుల సంఘం.",
+  gw_title_b: "0% కమీషన్. 100% డైరెక్ట్ వేతనం.",
+  gw_sub:
+    "సహకార సేవ కళాకారుల ట్రేడ్ యూనియన్ల యాజమాన్యంలో నడుస్తుంది — ఎలక్ట్రీషియన్లు, ప్లంబర్లు, వడ్రంగులు, మేస్త్రీలు, పెయింటర్లు, అప్లయన్స్ టెక్నీషియన్లు. మధ్యవర్తుల కమీషన్లను తొలగించి, మీరు చెల్లించే ప్రతి రూపాయి పని చేసిన కూలీకే చేరుస్తాము.",
+  gw_booker_badge: "కస్టమర్ల కోసం",
+  gw_booker_title: "బుకర్‌గా కొనసాగించండి",
+  gw_booker_desc:
+    "సర్టిఫైడ్ ఎలక్ట్రీషియన్లు, ప్లంబర్లు, వడ్రంగులు, అప్లయన్స్ నిపుణులను బుక్ చేయండి. యూనియన్ రేట్లు నేరుగా వర్కర్‌కు — మధ్యలో కట్ లేదు.",
+  gw_booker_h1: "UPI ద్వారా నేరుగా ఆర్టిజన్ ఖాతాకు చెల్లింపు",
+  gw_booker_h2: "పోలీస్ & నైపుణ్య ధృవీకరించిన టెక్నీషియన్లు",
+  gw_booker_h3: "రియల్-టైమ్ GPS రాడార్ డిస్పాచ్ & లైవ్ రాక",
+  gw_booker_cta: "ఆర్టిజన్ వెతకండి",
+  gw_worker_badge: "ఎక్కువగా చేరినవారు",
+  gw_worker_title: "ఆర్టిజన్‌గా కొనసాగించండి",
+  gw_worker_desc:
+    "మీ సర్వీస్ ఫీజు పూర్తిగా మీదే. మీ జిల్లా సహకార సంఘంలో చేరి, డిజిటల్ సర్టిఫికేట్ పొంది, కల్యాణ డివిడెండ్‌లు సంపాదించండి.",
+  gw_worker_h1: "ఏ బుకింగ్‌పైనా జీరో కమీషన్",
+  gw_worker_h2: "వాయిస్ ఆధారిత ట్రేడ్ సర్టిఫికేషన్ పరీక్ష",
+  gw_worker_h3: "ప్రమాద భీమా, పెన్షన్ నిధి & కల్యాణ ఫండ్",
+  gw_worker_cta: "చేరండి, సర్టిఫై అవ్వండి",
+  gw_admin_badge: "అధికారులకు మాత్రమే",
+  gw_admin_title: "ఫెడరేషన్ అడ్మిన్‌గా కొనసాగించండి",
+  gw_admin_desc:
+    "జిల్లా లేబర్ అధికారులు, సంఘ బోర్డు సభ్యుల కోసం అధికారిక పోర్టల్ — సర్టిఫికేషన్ రివ్యూ, సెటిల్‌మెంట్ నిర్వహణ, GIS హీట్‌మ్యాప్ ఆడిట్.",
+  gw_admin_h1: "ఆర్టిజన్ గుర్తింపు & నైపుణ్య ధృవీకరణ క్యూ",
+  gw_admin_h2: "లైవ్ జిల్లా GIS డిస్పాచ్ & డిమాండ్ హీట్‌మ్యాప్‌లు",
+  gw_admin_h3: "సహకార కల్యాణ ట్రెజరీ & డివిడెండ్ ఆడిట్",
+  gw_admin_cta: "గవర్నెన్స్ కన్సోల్ తెరవండి",
+  gw_m1_t: "0% ప్లాట్‌ఫారమ్ ఫీజు",
+  gw_m1_s: "పూర్తిగా ఆర్టిజన్‌దే",
+  gw_m2_t: "4-స్థాయి ధృవీకరణ",
+  gw_m2_s: "గుర్తింపు + వాయిస్ క్విజ్",
+  gw_m3_t: "100% P2P UPI",
+  gw_m3_s: "నేరుగా బ్యాంక్ సెటిల్‌మెంట్",
+  gw_m4_t: "జిల్లా సహకార సంఘాలు",
+  gw_m4_s: "ప్రజాస్వామ్య యూనియన్ పాలన",
   nav_tag: "సహకార గిగ్ ఫెడరేషన్",
   signin: "వర్కర్ సైన్-ఇన్",
   signout: "సైన్ అవుట్",
@@ -718,6 +838,44 @@ const te: Dict = {
 };
 
 const ta: Dict = {
+  gw_op_badge: "கூட்டமைப்பு இயங்கும் — டிஸ்பாட்ச் தொடர்கிறது",
+  gw_eyebrow: "கூட்டுறவு உரிமை · தொழிற்சங்க நிர்வாகம்",
+  gw_title_a: "கைவினைஞர்களுக்கான கைவினைஞர் கூட்டமைப்பு.",
+  gw_title_b: "0% கமிஷன். 100% நேரடி வருவாய்.",
+  gw_sub:
+    "சஹகார் சேவை கைவினைஞர் தொழிற்சங்கங்களின் உரிமையில் இயங்குகிறது — மின்சார், குழாய், தச்சு, கட்டிட, வண்ண தொழிலாளர்கள் மற்றும் சாதன டெக்னீஷியன்கள். இடைத்தரகர் கமிஷன்களை ஒழித்து, நீங்கள் செலுத்தும் ஒவ்வொரு ரூபாயும் வேலை செய்த தொழிலாளிக்கே செல்லும்.",
+  gw_booker_badge: "வாடிக்கையாளர்களுக்கு",
+  gw_booker_title: "புக்கராக தொடரவும்",
+  gw_booker_desc:
+    "சான்றளிக்கப்பட்ட மின்சார், குழாய், தச்சு, சாதன நிபுணர்களை புக் செய்யுங்கள். தொழிற்சங்க விகிதங்கள் நேரடியாக தொழிலாளிக்கு — நடுவில் கட் இல்லை.",
+  gw_booker_h1: "UPI மூலம் நேரடியாக கைவினைஞர் கணக்கிற்கு",
+  gw_booker_h2: "போலீஸ் & திறன் சரிபார்க்கப்பட்ட டெக்னீஷியன்கள்",
+  gw_booker_h3: "நேரடி GPS ரேடார் டிஸ்பாட்ச் & வருகை கண்காணிப்பு",
+  gw_booker_cta: "கைவினைஞரை தேடுங்கள்",
+  gw_worker_badge: "அதிகம் சேர்ந்தவர்கள்",
+  gw_worker_title: "கைவினைஞராக தொடரவும்",
+  gw_worker_desc:
+    "உங்கள் சர்வீஸ் கட்டணம் முழுவதும் உங்களுடையது. உங்கள் மாவட்ட கூட்டுறவு சங்கத்தில் சேர்ந்து, டிஜிட்டல் சான்றிதழ் பெற்று, நல ஈவுத்தொகை பெறுங்கள்.",
+  gw_worker_h1: "எந்த புக்கிங்கிலும் கமிஷன் இல்லை",
+  gw_worker_h2: "குரல் வழி திறன் சான்றிதழ் தேர்வு",
+  gw_worker_h3: "விபத்து காப்பீடு, ஓய்வூதிய நிதி & நல நிதி",
+  gw_worker_cta: "சேருங்கள், சான்றளியுங்கள்",
+  gw_admin_badge: "அதிகாரிகளுக்கு மட்டும்",
+  gw_admin_title: "கூட்டமைப்பு நிர்வாகியாக தொடரவும்",
+  gw_admin_desc:
+    "மாவட்ட தொழிலாள அதிகாரிகள் மற்றும் சங்க வாரிய உறுப்பினர்களுக்கான அதிகாரப்பூர்வ போர்ட்டல் — சான்றிதழ் ஆய்வு, தீர்வு நிர்வகிப்பு, GIS வெப்ப வரைபட தணிக்கை.",
+  gw_admin_h1: "கைவினைஞர் அடையாள & திறன் சரிபார்ப்பு வரிசை",
+  gw_admin_h2: "நேரடி மாவட்ட GIS டிஸ்பாட்ச் & தேவை வரைபடங்கள்",
+  gw_admin_h3: "கூட்டுறவு நல கருவூலம் & ஈவுத்தொகை தணிக்கை",
+  gw_admin_cta: "நிர்வாக கன்சோலை திறக்கவும்",
+  gw_m1_t: "0% தளக் கட்டணம்",
+  gw_m1_s: "முழுவதும் தொழிலாளிக்கே",
+  gw_m2_t: "4-நிலை சரிபார்ப்பு",
+  gw_m2_s: "அடையாளம் + குரல் தேர்வு",
+  gw_m3_t: "100% P2P UPI",
+  gw_m3_s: "நேரடி வங்கி தீர்வு",
+  gw_m4_t: "மாவட்ட கூட்டுறவு சங்கங்கள்",
+  gw_m4_s: "ஜனநாயக தொழிற்சங்க ஆட்சி",
   nav_home: "முகப்பு",
   nav_services: "சேவைகள்",
   nav_bookings: "என் பதிவுகள்",
