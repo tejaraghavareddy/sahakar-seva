@@ -14,7 +14,6 @@ export const roleValidator = v.union(
   v.literal(ROLES.USER),
   v.literal(ROLES.MEMBER),
 );
-export type Role = Infer<typeof roleValidator>;
 
 const schema = defineSchema(
   {
@@ -42,11 +41,12 @@ const schema = defineSchema(
       fullName: v.string(),
       phone: v.string(),
       trade: v.string(), // trade id, see src/lib/trades.ts
-      district: v.string(), // e.g. "Hyderabad"
+      district: v.string(),
       state: v.string(),
-      societyId: v.string(), // e.g. "hyd-cec"
+      societyId: v.string(),
       experienceYears: v.number(),
       dailyRate: v.number(), // union standard base day rate (INR)
+      upiVpa: v.optional(v.string()), // zero-commission direct settlement VPA
 
       // STEP 2 — Identity & police clearance (KYC)
       idType: v.string(), // "aadhaar" | "voter"
@@ -77,6 +77,50 @@ const schema = defineSchema(
       .index("by_userId", ["userId"])
       .index("by_trade", ["trade"])
       .index("by_kyc", ["kycStatus"]),
+
+    // Customer bookings — full lifecycle dispatch
+    bookings: defineTable({
+      customerId: v.id("users"),
+      serviceId: v.string(),
+      trade: v.string(),
+      serviceName: v.string(), // denormalized for listings
+      address: v.string(),
+      lat: v.optional(v.number()),
+      lng: v.optional(v.number()),
+      scheduledFor: v.number(),
+      urgent: v.boolean(),
+      notes: v.optional(v.string()),
+      welfareOptIn: v.boolean(),
+      base: v.number(),
+      hourly: v.number(),
+      welfareAmt: v.number(), // 3% of base when opted in
+      total: v.number(),
+      status: v.string(), // pending|accepted|enroute|inprogress|payment|completed|settled|cancelled
+      workerId: v.optional(v.id("artisans")), // assigned on accept
+      workerUserId: v.optional(v.id("users")),
+      workerVpa: v.optional(v.string()), // worker's own UPI id — funds go straight to them
+      acceptedAt: v.optional(v.number()),
+      utr: v.optional(v.string()), // UPI transaction reference
+      paidAt: v.optional(v.number()),
+      settledAt: v.optional(v.number()),
+      cancelledAt: v.optional(v.number()),
+      cancelBy: v.optional(v.string()), // "customer" | "worker" | "admin"
+      createdAt: v.number(),
+    })
+      .index("by_customer", ["customerId"])
+      .index("by_worker", ["workerUserId"])
+      .index("by_status", ["status"])
+      .index("by_created", ["createdAt"]),
+
+    // In-booking chat between customer and worker
+    messages: defineTable({
+      bookingId: v.id("bookings"),
+      senderId: v.id("users"),
+      senderName: v.string(),
+      senderRole: v.string(), // "customer" | "worker" | "admin"
+      body: v.string(),
+      at: v.number(),
+    }).index("by_booking", ["bookingId"]),
   },
   {
     schemaValidation: false,

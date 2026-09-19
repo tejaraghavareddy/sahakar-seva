@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { Link, useNavigate } from "react-router";
+import type { Id } from "@/convex/_generated/dataModel";
+import { Link } from "react-router";
 import { useAuth } from "@/hooks/use-auth";
 import { useLang } from "@/lib/i18n";
 import { getTrade, getSociety } from "@/lib/trades";
@@ -15,27 +16,47 @@ import {
   TlButton,
 } from "@/components/terminal";
 import { IdCardDialog } from "@/components/IdCardDialog";
-import { Loader2, LogOut, Radio, Terminal } from "lucide-react";
+import {
+  Loader2,
+  LogOut,
+  Radio,
+  Radar,
+  Briefcase,
+  Wallet,
+  Terminal,
+} from "lucide-react";
+
+const STATUS_TONE: Record<string, "neutral" | "ok" | "warn" | "saffron"> = {
+  pending: "warn",
+  accepted: "saffron",
+  enroute: "saffron",
+  inprogress: "saffron",
+  payment: "warn",
+  completed: "ok",
+  settled: "ok",
+  cancelled: "neutral",
+};
 
 export default function Dashboard() {
   const { t } = useLang();
   const { user, isLoading: authLoading, signOut } = useAuth();
   const artisan = useQuery(api.artisans.getMyArtisan, {});
+  const jobs = useQuery(api.bookings.listForWorker, {});
   const setPresence = useMutation(api.artisans.setPresence);
-  const navigate = useNavigate();
+  const acceptJob = useMutation(api.bookings.accept);
+  const advance = useMutation(api.bookings.advance);
 
   const [geoError, setGeoError] = useState<string | null>(null);
   const [toggling, setToggling] = useState(false);
+  const [accepting, setAccepting] = useState<string | null>(null);
+  const [busyAdvance, setBusyAdvance] = useState<string | null>(null);
 
-  /* Stop any speech when leaving the page. */
   useEffect(() => () => stopSpeaking(), []);
 
-  /* Telemetry ping loop while online. */
+  /* GPS telemetry ping while online */
   useEffect(() => {
     if (!artisan?.isOnline) return;
     let cancelled = false;
-    let timer: ReturnType<typeof setInterval> | null = null;
-
     const ping = () => {
       if (!("geolocation" in navigator)) return;
       navigator.geolocation.getCurrentPosition(
@@ -54,12 +75,11 @@ export default function Dashboard() {
         { enableHighAccuracy: true, maximumAge: 15000 },
       );
     };
-
     ping();
-    timer = setInterval(ping, 20000);
+    const timer = setInterval(ping, 20000);
     return () => {
       cancelled = true;
-      if (timer) clearInterval(timer);
+      clearInterval(timer);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [artisan?.isOnline]);
@@ -94,17 +114,35 @@ export default function Dashboard() {
     }
   }
 
+  async function handleAccept(id: Id<"bookings">) {
+    setAccepting(id);
+    try {
+      await acceptJob({ id });
+    } finally {
+      setAccepting(null);
+    }
+  }
+
+  async function handleAdvance(id: Id<"bookings">) {
+    setBusyAdvance(id);
+    try {
+      await advance({ id });
+    } finally {
+      setBusyAdvance(null);
+    }
+  }
+
   async function handleSignOut() {
     stopSpeaking();
     if (artisan?.isOnline) {
       try {
         await setPresence({ isOnline: false });
       } catch {
-        // ignore
+        /* ignore */
       }
     }
     await signOut();
-    navigate("/");
+    window.location.href = "/";
   }
 
   if (authLoading || artisan === undefined) {
@@ -119,10 +157,23 @@ export default function Dashboard() {
   const trade = artisan ? getTrade(artisan.trade) : undefined;
   const TradeIcon = trade?.icon;
   const society = artisan ? getSociety(artisan.societyId) : undefined;
+  const mine = jobs?.mine ?? [];
+  const radar = jobs?.radar ?? [];
+  const active = mine.filter((b) =>
+    ["accepted", "enroute", "inprogress"].includes(b.status),
+  );
+  const earned = mine
+    .filter((b) => b.status === "settled" || b.status === "completed")
+    .reduce((sum, b) => sum + b.base, 0);
+
+  const stageKeys: Record<string, string> = {
+    accepted: "st_enroute",
+    enroute: "st_inprogress",
+    inprogress: "st_payment",
+  };
 
   return (
     <div className="tl-shell">
-      {/* Top band */}
       <header className="tl-band sticky top-0 z-40">
         <div className="mx-auto flex h-14 w-full max-w-5xl items-center justify-between px-4 sm:px-6">
           <Link to="/" className="flex items-center gap-2">
@@ -135,7 +186,6 @@ export default function Dashboard() {
             <LanguagePicker />
             <TlButton variant="ghost" onClick={handleSignOut}>
               <LogOut className="size-4" />
-              {t("signout")}
             </TlButton>
           </div>
         </div>
@@ -146,11 +196,7 @@ export default function Dashboard() {
         <div className="flex flex-wrap items-end justify-between gap-4">
           <SectionHeader
             title={t("hub_title")}
-            sub={
-              artisan
-                ? t("hub_welcome", { name: artisan.fullName })
-                : t("hub_not_onboarded")
-            }
+            sub={artisan ? t("hub_welcome", { name: artisan.fullName }) : t("hub_not_onboarded")}
           />
           {artisan && (
             <div className="flex items-center gap-2">
@@ -176,7 +222,7 @@ export default function Dashboard() {
 
         {!artisan && (
           <Panel className="mt-8">
-            <div className="flex flex-col items-center gap-4 py-8 text-center">
+            <div className="flex flex-col items-center gap-4 py-10 text-center">
               <span className="flex size-12 items-center justify-center rounded-full border border-border bg-secondary">
                 <Terminal className="size-5 text-muted-foreground" />
               </span>
@@ -184,7 +230,9 @@ export default function Dashboard() {
                 {t("hub_not_onboarded")}
               </p>
               <Link to="/onboarding">
-                <TlButton>{t("hub_cta_onboard")}</TlButton>
+                <TlButton variant="saffron" className="tl-btn-saffron">
+                  {t("hub_cta_onboard")}
+                </TlButton>
               </Link>
             </div>
           </Panel>
@@ -192,8 +240,9 @@ export default function Dashboard() {
 
         {artisan && (
           <div className="mt-6 grid gap-5 lg:grid-cols-3">
-            {/* ── Column 1: status + telemetry ── */}
+            {/* Left column */}
             <div className="flex flex-col gap-5">
+              {/* Telemetry */}
               <Panel title={t("telemetry")} tag={online ? "live" : "off"}>
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-center gap-3">
@@ -205,9 +254,7 @@ export default function Dashboard() {
                       }`}
                     >
                       {TradeIcon && (
-                        <TradeIcon
-                          className={`size-5 ${online ? "text-ok" : "text-muted-foreground"}`}
-                        />
+                        <TradeIcon className={`size-5 ${online ? "text-ok" : "text-muted-foreground"}`} />
                       )}
                     </span>
                     <div>
@@ -215,7 +262,7 @@ export default function Dashboard() {
                         {online ? t("telemetry_on") : t("telemetry_off")}
                       </p>
                       <p className="mt-0.5 text-[10px] text-muted-foreground">
-                        {online ? "20s ping interval" : "—"}
+                        {online ? "20s ping" : "—"}
                       </p>
                     </div>
                   </div>
@@ -233,90 +280,121 @@ export default function Dashboard() {
                     }
                   />
                 </div>
-                {geoError && (
-                  <p className="mt-3 text-[10px] text-warn">{geoError}</p>
-                )}
+                {geoError && <p className="mt-3 text-[10px] text-warn">{geoError}</p>}
               </Panel>
 
-              <Panel title={t("welfare")} tag="0% commission">
+              {/* Earnings */}
+              <Panel title={t("earnings_title")} bodyClassName="p-4">
                 <div className="grid grid-cols-2 gap-px overflow-hidden rounded-sm border border-border bg-border">
-                  <MoneyCell
-                    label={t("welfare")}
-                    value={`₹${artisan.welfareBalance.toLocaleString("en-IN")}`}
-                  />
-                  <MoneyCell
-                    label={t("dividend")}
-                    value={`₹${artisan.dividendBalance.toLocaleString("en-IN")}`}
-                  />
+                  <div className="bg-card px-3 py-3">
+                    <p className="tl-label">{t("earn_collected")}</p>
+                    <p className="mt-1 text-lg font-bold text-forest">₹{earned.toLocaleString("en-IN")}</p>
+                  </div>
+                  <div className="bg-card px-3 py-3">
+                    <p className="tl-label">{t("welfare")}</p>
+                    <p className="mt-1 text-lg font-bold text-forest">
+                      ₹{artisan.welfareBalance.toLocaleString("en-IN")}
+                    </p>
+                  </div>
                 </div>
                 <p className="mt-3 text-[10px] leading-4 text-muted-foreground">
                   {t("ledger_note")}
                 </p>
               </Panel>
+
+              {/* Credential */}
+              <Panel title={t("card_id")}>
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-xs font-bold">
+                      {artisan.credentialId ?? t("quiz_none")}
+                    </p>
+                    <p className="text-[10px] text-muted-foreground">
+                      {t("cred_score")}: {artisan.quizScore ?? 0}%
+                    </p>
+                  </div>
+                  {artisan.credentialId && <IdCardDialog artisan={artisan} />}
+                </div>
+              </Panel>
             </div>
 
-            {/* ── Column 2-3: profile + credential ── */}
+            {/* Right: radar + jobs */}
             <div className="flex flex-col gap-5 lg:col-span-2">
+              {/* Radar */}
               <Panel
-                title="artisan profile"
-                tag={t("member_since") + " " + new Date(artisan.createdAt).toLocaleDateString()}
+                title={t("radar_title")}
+                tag={`${radar.length}`}
+                bodyClassName="p-0"
               >
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <InfoRow label={t("f_fullname")} value={artisan.fullName} />
-                  <InfoRow label={t("f_phone")} value={artisan.phone} />
-                  <InfoRow label={t("f_trade")} value={artisan.trade} />
-                  <InfoRow
-                    label={t("f_district")}
-                    value={`${artisan.district}, ${artisan.state}`}
-                  />
-                  <InfoRow
-                    label={t("society_row")}
-                    value={society?.name ?? artisan.societyId}
-                  />
-                  <InfoRow
-                    label={t("experience")}
-                    value={`${artisan.experienceYears} ${t("yrs")}`}
-                  />
-                  <InfoRow
-                    label={t("rate")}
-                    value={`₹${artisan.dailyRate.toLocaleString("en-IN")} / day`}
-                  />
-                  <InfoRow
-                    label={t("kyc_ref")}
-                    value={artisan.kycRef ?? "—"}
-                  />
+                <div className="tl-grid-bg divide-y divide-border">
+                  {radar.length === 0 && (
+                    <p className="px-5 py-10 text-center text-xs text-muted-foreground">
+                      {t("radar_empty")}
+                    </p>
+                  )}
+                  {radar.map((b) => (
+                    <div key={b._id} className="flex items-center gap-3 px-4 py-3">
+                      <Radar className="size-4 shrink-0 text-saffron" />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-xs font-bold">{b.serviceName}</p>
+                        <p className="truncate text-[10px] text-muted-foreground">
+                          {b.address.slice(0, 44)} · ₹{b.total}
+                        </p>
+                      </div>
+                      <TlButton
+                        className="h-8 px-3 text-xs"
+                        onClick={() => handleAccept(b._id)}
+                        disabled={accepting === b._id}
+                      >
+                        {accepting === b._id ? (
+                          <Loader2 className="size-3.5 animate-spin" />
+                        ) : (
+                          t("radar_accept")
+                        )}
+                      </TlButton>
+                    </div>
+                  ))}
                 </div>
               </Panel>
 
-              <Panel title={t("card_id")}>
-                <div className="flex flex-wrap items-center justify-between gap-4">
-                  <div className="flex items-center gap-3">
-                    <span className="flex size-11 items-center justify-center rounded-sm border border-ok/30 bg-ok-soft">
-                      <StatusDot tone="ok" blink />
-                    </span>
-                    <div>
-                      <p className="text-xs font-bold">
-                        {artisan.credentialId ?? t("quiz_none")}
-                      </p>
-                      <p className="text-[10px] text-muted-foreground">
-                        {t("cred_score")}: {artisan.quizScore ?? 0}%
-                      </p>
+              {/* Active + history jobs */}
+              <Panel title={t("myjobs_title")} bodyClassName="p-0">
+                <div className="divide-y divide-border">
+                  {mine.length === 0 && (
+                    <p className="px-5 py-10 text-center text-xs text-muted-foreground">
+                      {t("myjobs_empty")}
+                    </p>
+                  )}
+                  {mine.map((b) => (
+                    <div key={b._id} className="flex items-center gap-3 px-4 py-3">
+                      <Briefcase className="size-4 shrink-0 text-muted-foreground" />
+                      <div className="min-w-0 flex-1">
+                        <Link to={`/bookings/${b._id}`} className="block truncate text-xs font-bold hover:underline">
+                          {b.serviceName}
+                        </Link>
+                        <p className="truncate text-[10px] text-muted-foreground">
+                          {new Date(b.scheduledFor).toLocaleDateString("en-IN")} · ₹{b.total}
+                        </p>
+                      </div>
+                      <MonoBadge tone={STATUS_TONE[b.status] ?? "neutral"}>
+                        {t(`st_${b.status}`)}
+                      </MonoBadge>
+                      {stageKeys[b.status] && (
+                        <TlButton
+                          variant="outline"
+                          className="h-8 px-2.5 text-[11px]"
+                          onClick={() => handleAdvance(b._id)}
+                          disabled={busyAdvance === b._id}
+                        >
+                          {busyAdvance === b._id ? (
+                            <Loader2 className="size-3.5 animate-spin" />
+                          ) : (
+                            t(stageKeys[b.status])
+                          )}
+                        </TlButton>
+                      )}
                     </div>
-                  </div>
-                  <IdCardDialog artisan={artisan} />
-                </div>
-                <div className="mt-4 grid grid-cols-2 gap-px overflow-hidden rounded-sm border border-border bg-border sm:grid-cols-4">
-                  <TeleCell label={t("kyc_row")} value={t("kyc_badge")} />
-                  <TeleCell
-                    label={t("quiz_row")}
-                    value={
-                      artisan.quizPassed
-                        ? `${artisan.quizScore ?? 0}%`
-                        : t("quiz_none")
-                    }
-                  />
-                  <TeleCell label="commission" value="0%" />
-                  <TeleCell label="welfare" tone="ok" value="active" />
+                  ))}
                 </div>
               </Panel>
             </div>
@@ -327,47 +405,11 @@ export default function Dashboard() {
   );
 }
 
-function TeleCell({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: string;
-  tone?: "ok";
-}) {
+function TeleCell({ label, value }: { label: string; value: string }) {
   return (
     <div className="bg-card px-3 py-2.5">
-      <p className="text-[9px] uppercase tracking-widest text-muted-foreground">
-        {label}
-      </p>
-      <p
-        className={`mt-0.5 truncate text-xs font-bold ${
-          tone === "ok" ? "text-ok" : ""
-        }`}
-      >
-        {value}
-      </p>
-    </div>
-  );
-}
-
-function MoneyCell({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="bg-card px-4 py-3">
-      <p className="tl-label">{label}</p>
-      <p className="mt-1 text-lg font-bold tracking-tight text-forest">
-        {value}
-      </p>
-    </div>
-  );
-}
-
-function InfoRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between gap-3 border-b border-dashed border-border pb-2 text-xs last:border-0">
-      <span className="text-muted-foreground">{label}</span>
-      <span className="text-right font-semibold">{value}</span>
+      <p className="text-[9px] uppercase tracking-widest text-muted-foreground">{label}</p>
+      <p className="mt-0.5 truncate text-xs font-bold">{value}</p>
     </div>
   );
 }

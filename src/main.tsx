@@ -15,6 +15,12 @@ const Landing = lazy(() => import("./pages/Landing.tsx"));
 const AuthPage = lazy(() => import("./pages/Auth.tsx"));
 const Dashboard = lazy(() => import("./pages/Dashboard.tsx"));
 const Onboarding = lazy(() => import("./pages/Onboarding.tsx"));
+const Services = lazy(() => import("./pages/Services.tsx"));
+const ServiceDetail = lazy(() => import("./pages/ServiceDetail.tsx"));
+const Book = lazy(() => import("./pages/Book.tsx"));
+const Bookings = lazy(() => import("./pages/Bookings.tsx"));
+const BookingDetail = lazy(() => import("./pages/BookingDetail.tsx"));
+const Admin = lazy(() => import("./pages/Admin.tsx"));
 const NotFound = lazy(() => import("./pages/NotFound.tsx"));
 
 // Simple loading fallback for route transitions
@@ -132,6 +138,46 @@ createRoot(document.getElementById("root")!).render(
                   element={
                     <RequireAuth>
                       <Dashboard />
+                    </RequireAuth>
+                  }
+                />
+                <Route
+                  path="/services"
+                  element={<Services />}
+                />
+                <Route
+                  path="/services/:id"
+                  element={<ServiceDetail />}
+                />
+                <Route
+                  path="/book/:id"
+                  element={
+                    <RequireAuth>
+                      <Book />
+                    </RequireAuth>
+                  }
+                />
+                <Route
+                  path="/bookings"
+                  element={
+                    <RequireAuth>
+                      <Bookings />
+                    </RequireAuth>
+                  }
+                />
+                <Route
+                  path="/bookings/:id"
+                  element={
+                    <RequireAuth>
+                      <BookingDetail />
+                    </RequireAuth>
+                  }
+                />
+                <Route
+                  path="/admin"
+                  element={
+                    <RequireAuth>
+                      <Admin />
                     </RequireAuth>
                   }
                 />

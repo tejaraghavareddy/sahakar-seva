@@ -1,5 +1,8 @@
-import { useQuery } from "convex/react";
+import {
+  useQuery,
+} from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { Link, useNavigate } from "react-router";
 import { useAuth } from "@/hooks/use-auth";
 import { useLang } from "@/lib/i18n";
 import { TRADES, getTrade } from "@/lib/trades";
@@ -12,18 +15,14 @@ import {
   TlButton,
 } from "@/components/terminal";
 import { motion } from "framer-motion";
-import { Link, useNavigate } from "react-router";
 import {
   ArrowRight,
   BadgeCheck,
-  Cpu,
-  Gauge,
-  Languages,
-  Mic,
-  Radio,
+  LayoutDashboard,
   ShieldCheck,
-  Terminal,
-  UserPlus,
+  Store,
+  Users,
+  Wrench,
 } from "lucide-react";
 
 function fmt(n: number | undefined): string {
@@ -31,17 +30,46 @@ function fmt(n: number | undefined): string {
 }
 
 export default function Landing() {
-  const { t, lang } = useLang();
+  const { t } = useLang();
   const { isAuthenticated, isLoading } = useAuth();
   const navigate = useNavigate();
+
   const stats = useQuery(api.artisans.federationStats, {}) ?? {
     total: 0,
     online: 0,
     verified: 0,
     byTrade: {},
   };
-  const feed = useQuery(api.artisans.listArtisans, {}) ?? [];
-  const verifiedFeed = feed.filter((a) => a.credentialId).slice(0, 6);
+
+  const portals = [
+    {
+      key: "workers",
+      to: "/onboarding",
+      icon: Wrench,
+      color: "saffron",
+      title: t("portal_workers_t"),
+      desc: t("portal_workers_d"),
+      cta: isAuthenticated ? t("nav_hub") : t("cta_join"),
+    },
+    {
+      key: "customers",
+      to: "/services",
+      icon: Store,
+      color: "teal",
+      title: t("portal_customers_t"),
+      desc: t("portal_customers_d"),
+      cta: isAuthenticated ? t("nav_services") : t("signin"),
+    },
+    {
+      key: "admin",
+      to: "/admin",
+      icon: ShieldCheck,
+      color: "plum",
+      title: t("portal_admin_t"),
+      desc: t("portal_admin_d"),
+      cta: t("portal_open"),
+    },
+  ];
 
   return (
     <div className="tl-shell flex flex-col">
@@ -49,12 +77,15 @@ export default function Landing() {
       <header className="tl-band sticky top-0 z-40">
         <div className="mx-auto flex h-14 w-full max-w-6xl items-center justify-between px-4 sm:px-6">
           <Link to="/" className="flex items-center gap-2.5">
-            <span className="flex size-7 items-center justify-center rounded-sm border border-foreground bg-foreground text-background">
-              <Terminal className="size-4" />
+            <span className="flex size-7 items-center justify-center rounded-sm border border-foreground bg-foreground text-xs font-bold text-background">
+              &gt;_
             </span>
             <span className="text-sm font-bold tracking-tight">
               sahakar-seva
-              <span className="text-muted-foreground">/{t("nav_tag")}</span>
+              <span className="hidden text-muted-foreground sm:inline">
+                {" "}
+                / {t("nav_tag")}
+              </span>
             </span>
           </Link>
           <div className="flex items-center gap-2">
@@ -93,14 +124,17 @@ export default function Landing() {
               {t("hero_sub")}
             </p>
             <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+              <Link to="/services">
+                <TlButton variant="saffron" className="tl-btn-saffron">
+                  {t("nav_services")}
+                  <ArrowRight className="size-4" />
+                </TlButton>
+              </Link>
               <Link to="/auth?returnTo=%2Fonboarding">
                 <TlButton variant="primary">
                   {t("cta_start")}
                   <ArrowRight className="size-4" />
                 </TlButton>
-              </Link>
-              <Link to="/dashboard">
-                <TlButton variant="outline">{t("cta_dashboard")}</TlButton>
               </Link>
             </div>
           </motion.div>
@@ -111,52 +145,66 @@ export default function Landing() {
             <Stat
               label={t("stat_online")}
               value={fmt(stats.online)}
-              icon={<Radio className="size-3.5" />}
               tone="ok"
             />
             <Stat
               label={t("stat_verified")}
               value={fmt(stats.verified)}
-              icon={<ShieldCheck className="size-3.5" />}
+              icon={<BadgeCheck className="size-3.5" />}
             />
-            <Stat label={t("stat_commission")} value="0%" tone="saffron" icon={<Gauge className="size-3.5" />} />
+            <Stat
+              label={t("stat_commission")}
+              value="0%"
+              tone="saffron"
+              icon={<span className="text-xs font-bold">₹</span>}
+            />
           </div>
         </div>
         <div className="tl-keyline h-1.5 w-full" aria-hidden />
       </section>
 
-      {/* ── Trades grid ──────────────────────────────────────── */}
+      {/* ── Three portals ────────────────────────────────────── */}
       <section className="mx-auto w-full max-w-6xl px-4 py-14 sm:px-6">
-        <SectionHeader
-          index="[01]"
-          title={t("trades_title")}
-          sub={t("trades_sub")}
-        />
-        <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {TRADES.map((trade, i) => {
-            const Icon = trade.icon;
-            const count = stats.byTrade?.[trade.id] ?? 0;
+        <SectionHeader index="[01]" title={t("portals_title")} sub={t("portals_sub")} />
+        <div className="mt-6 grid gap-4 md:grid-cols-3">
+          {portals.map((p, i) => {
+            const Icon = p.icon;
+            const accent =
+              p.color === "saffron"
+                ? "border-saffron/40"
+                : p.color === "teal"
+                  ? "border-teal/40"
+                  : "border-plum/40";
+            const chip =
+              p.color === "saffron"
+                ? "bg-saffron-soft text-saffron"
+                : p.color === "teal"
+                  ? "bg-teal-soft text-teal"
+                  : "bg-plum-soft text-plum";
             return (
               <motion.div
-                key={trade.id}
+                key={p.key}
                 initial={{ opacity: 0, y: 10 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, margin: "-40px" }}
-                transition={{ duration: 0.35, delay: i * 0.05 }}
+                transition={{ duration: 0.35, delay: i * 0.06 }}
               >
-                <Panel className="h-full transition-shadow hover:shadow-md">
-                  <div className="flex items-start justify-between">
-                    <span className="flex size-10 items-center justify-center rounded-sm border border-border bg-secondary">
-                      <Icon className="size-5 text-forest" />
-                    </span>
-                    <MonoBadge tone={count > 0 ? "ok" : "neutral"}>
-                      {fmt(count)} reg
-                    </MonoBadge>
-                  </div>
-                  <p className="mt-4 text-sm font-bold">{trade.id}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    ₹{fmt(trade.baseRate)} {t("per_day")} · union base rate
+                <Panel className={`h-full border-t-2 ${accent}`}>
+                  <span
+                    className={`flex size-10 items-center justify-center rounded-sm ${chip}`}
+                  >
+                    <Icon className="size-5" />
+                  </span>
+                  <p className="mt-4 text-sm font-bold">{p.title}</p>
+                  <p className="mt-1.5 min-h-[3.5rem] text-xs leading-5 text-muted-foreground">
+                    {p.desc}
                   </p>
+                  <Link to={p.to}>
+                    <TlButton variant="outline" className="mt-4 w-full">
+                      {p.cta}
+                      <ArrowRight className="size-4" />
+                    </TlButton>
+                  </Link>
                 </Panel>
               </motion.div>
             );
@@ -164,100 +212,95 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* ── Onboarding protocol ─────────────────────────────── */}
+      {/* ── Trades strip ─────────────────────────────────────── */}
       <section className="border-y border-border bg-card">
         <div className="mx-auto w-full max-w-6xl px-4 py-14 sm:px-6">
-          <SectionHeader index="[02]" title={t("how_title")} />
-          <div className="mt-6 grid grid-cols-1 gap-px overflow-hidden rounded-sm border border-border bg-border md:grid-cols-4">
-            {(
-              [
-                ["01", t("step_profile"), t("how1_desc"), "userplus"],
-                ["02", t("step_identity"), t("how2_desc"), "shield"],
-                ["03", t("step_skill"), t("how3_desc"), "mic"],
-                ["04", t("step_credential"), t("how4_desc"), "badge"],
-              ] as const
-            ).map(([n, title, desc, icon], i) => (
-              <motion.div
-                key={n}
-                initial={{ opacity: 0, y: 8 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.3, delay: i * 0.06 }}
-                className="bg-card p-5"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="font-mono text-xs font-bold text-saffron">
-                    {n}
-                  </span>
-                  <StepIcon name={icon} />
-                </div>
-                <p className="mt-3 text-sm font-bold">{title}</p>
-                <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                  {desc}
-                </p>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── Live verification feed ──────────────────────────── */}
-      <section className="mx-auto w-full max-w-6xl px-4 py-14 sm:px-6">
-        <SectionHeader
-          index="[03]"
-          title={t("ticker_title")}
-          sub={t("ticker_empty")}
-        />
-        <Panel className="mt-6" bodyClassName="p-0">
-          <div className="tl-grid-bg divide-y divide-border">
-            {verifiedFeed.length === 0 && (
-              <p className="px-5 py-10 text-center text-xs text-muted-foreground">
-                {t("ticker_empty")}
-              </p>
-            )}
-            {verifiedFeed.map((a, i) => {
-              const Icon = getTrade(a.trade)?.icon;
+          <SectionHeader index="[02]" title={t("trades_title")} sub={t("trades_sub")} />
+          <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+            {TRADES.map((trade, i) => {
+              const Icon = trade.icon;
+              const count = stats.byTrade?.[trade.id] ?? 0;
               return (
                 <motion.div
-                  key={a._id}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: i * 0.05 }}
-                  className="flex items-center justify-between gap-3 px-5 py-3"
+                  key={trade.id}
+                  initial={{ opacity: 0, y: 8 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.3, delay: i * 0.04 }}
                 >
-                  <div className="flex min-w-0 items-center gap-3">
-                    <StatusDot tone="ok" blink={i === 0} />
-                    <span className="truncate text-xs font-semibold">
-                      {a.fullName}
+                  <Panel className="h-full text-center">
+                    <span
+                      className={`mx-auto flex size-10 items-center justify-center rounded-sm ${
+                        trade.color === "saffron"
+                          ? "bg-saffron-soft text-saffron"
+                          : trade.color === "blue"
+                            ? "bg-blue-soft text-blue"
+                            : trade.color === "amber"
+                              ? "bg-warn-soft text-warn"
+                              : trade.color === "forest"
+                                ? "bg-forest-soft text-forest"
+                                : trade.color === "plum"
+                                  ? "bg-plum-soft text-plum"
+                                  : "bg-teal-soft text-teal"
+                      }`}
+                    >
+                      <Icon className="size-5" />
                     </span>
-                    <span className="hidden text-xs text-muted-foreground sm:inline">
-                      {a.district}
-                    </span>
-                    {Icon && <Icon className="size-3.5 shrink-0 text-forest" />}
-                  </div>
-                  <code className="shrink-0 text-[10px] text-ok">
-                    {a.credentialId}
-                  </code>
+                    <p className="mt-3 text-xs font-bold">{trade.id}</p>
+                    <p className="mt-0.5 text-[10px] text-muted-foreground">
+                      ₹{fmt(trade.baseRate)} {t("per_day")}
+                    </p>
+                    <p className="mt-1 text-[10px] font-semibold text-ok">
+                      {fmt(count)} reg
+                    </p>
+                  </Panel>
                 </motion.div>
               );
             })}
           </div>
-        </Panel>
+        </div>
+      </section>
+
+      {/* ── How onboarding works ─────────────────────────────── */}
+      <section className="mx-auto w-full max-w-6xl px-4 py-14 sm:px-6">
+        <SectionHeader index="[03]" title={t("how_title")} />
+        <div className="mt-6 grid grid-cols-1 gap-px overflow-hidden rounded-sm border border-border bg-border md:grid-cols-4">
+          {(
+            [
+              ["01", t("step_profile"), t("how1_desc")],
+              ["02", t("step_identity"), t("how2_desc")],
+              ["03", t("step_skill"), t("how3_desc")],
+              ["04", t("step_credential"), t("how4_desc")],
+            ] as const
+          ).map(([n, title, desc], i) => (
+            <motion.div
+              key={n}
+              initial={{ opacity: 0, y: 8 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.3, delay: i * 0.05 }}
+              className="bg-card p-5"
+            >
+              <span className="text-xs font-bold text-saffron">{n}</span>
+              <p className="mt-2 text-sm font-bold">{title}</p>
+              <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                {desc}
+              </p>
+            </motion.div>
+          ))}
+        </div>
       </section>
 
       {/* ── Footer ───────────────────────────────────────────── */}
       <footer className="mt-auto border-t border-border bg-card">
         <div className="mx-auto flex w-full max-w-6xl flex-col gap-3 px-4 py-6 sm:flex-row sm:items-center sm:justify-between sm:px-6">
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <Cpu className="size-3.5" />
+            <Users className="size-3.5" />
             <span>{t("footer_note")}</span>
           </div>
-          <div className="flex items-center gap-3 text-[10px] uppercase tracking-widest text-muted-foreground">
-            <Languages className="size-3.5" />
-            <span>en · hi · te · ta · bn</span>
-            <span className="text-border">|</span>
-            <BadgeCheck className="size-3.5" />
-            <span>{t("lang_label")}: {lang}</span>
+          <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-muted-foreground">
+            <LayoutDashboard className="size-3.5" />
+            <span>workers · customers · admin</span>
           </div>
         </div>
       </footer>
@@ -301,13 +344,4 @@ function Stat({
       </p>
     </div>
   );
-}
-
-function StepIcon({ name }: { name: string }) {
-  const cls = "size-4 text-muted-foreground";
-  if (name === "userplus") return <UserPlus className={cls} />;
-  if (name === "shield") return <ShieldCheck className={cls} />;
-  if (name === "mic") return <Mic className={cls} />;
-  if (name === "badge") return <BadgeCheck className={cls} />;
-  return <span className={`font-mono text-xs ${cls}`}>{name}</span>;
 }

@@ -119,7 +119,7 @@ export function SectionHeader({
 /* ---------- Terminal button ---------- */
 
 interface TlButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: "primary" | "outline" | "ghost" | "ok";
+  variant?: "primary" | "outline" | "ghost" | "ok" | "saffron";
 }
 
 export function TlButton({
@@ -136,6 +136,8 @@ export function TlButton({
           "border-foreground bg-foreground text-background hover:bg-foreground/90",
         variant === "ok" &&
           "border-ok bg-ok text-white hover:bg-ok/90",
+        variant === "saffron" &&
+          "tl-btn-saffron",
         variant === "outline" &&
           "border-input bg-card text-foreground hover:bg-secondary",
         variant === "ghost" &&

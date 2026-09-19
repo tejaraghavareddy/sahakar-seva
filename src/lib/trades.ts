@@ -27,6 +27,16 @@ import {
   Snowflake,
   CircuitBoard,
   BatteryCharging,
+  Fan,
+  WashingMachine,
+  Refrigerator,
+  Microwave,
+  Lamp,
+  Timer,
+  Container,
+  DoorOpen,
+  Sofa,
+  Landmark,
   type LucideIcon,
 } from "lucide-react";
 
@@ -44,20 +54,94 @@ export interface Trade {
   id: TradeId;
   icon: LucideIcon;
   baseRate: number; // union standard base day rate, INR
+  color: string; // tile accent (theme color name)
 }
 
 export const TRADES: Trade[] = [
-  { id: "electrician", icon: Zap, baseRate: 850 },
-  { id: "plumber", icon: Droplets, baseRate: 800 },
-  { id: "carpenter", icon: Hammer, baseRate: 900 },
-  { id: "mason", icon: BrickWall, baseRate: 820 },
-  { id: "painter", icon: PaintRoller, baseRate: 750 },
-  { id: "appliance", icon: Wrench, baseRate: 880 },
+  { id: "electrician", icon: Zap, baseRate: 850, color: "saffron" },
+  { id: "plumber", icon: Droplets, baseRate: 800, color: "blue" },
+  { id: "carpenter", icon: Hammer, baseRate: 900, color: "amber" },
+  { id: "mason", icon: BrickWall, baseRate: 820, color: "forest" },
+  { id: "painter", icon: PaintRoller, baseRate: 750, color: "plum" },
+  { id: "appliance", icon: Wrench, baseRate: 880, color: "teal" },
 ];
 
 export function getTrade(id: string): Trade | undefined {
   return TRADES.find((t) => t.id === id);
 }
+
+/* ---------------- Service catalog (customer portal) ---------------- */
+
+export interface Service {
+  id: string;
+  trade: TradeId;
+  name: string;
+  desc: string;
+  base: number; // visit/inspection charge, INR
+  hourly: number; // per-hour labour after inspection, INR
+  urgent: boolean; // supports emergency dispatch
+  icon: LucideIcon;
+  color: string; // theme color family for the tile
+}
+
+export const SERVICES: Service[] = [
+  // Electrical
+  { id: "el-fan", trade: "electrician", name: "Ceiling fan install or repair", desc: "Mounting, capacitor swap, speed issues, wobble fixing.", base: 149, hourly: 250, urgent: false, icon: Fan, color: "saffron" },
+  { id: "el-wire", trade: "electrician", name: "Full house wiring check", desc: "Load testing, earthing audit, MCB and fuse inspection.", base: 299, hourly: 350, urgent: false, icon: Cable, color: "saffron" },
+  { id: "el-short", trade: "electrician", name: "Short circuit / power failure", desc: "Emergency tripping, burnt smell, spark diagnosis.", base: 249, hourly: 400, urgent: true, icon: AlertTriangle, color: "saffron" },
+  { id: "el-light", trade: "electrician", name: "Light & switch fittings", desc: "Chandeliers, panels, dimmers, new switch points.", base: 129, hourly: 250, urgent: false, icon: Lightbulb, color: "saffron" },
+  // Plumbing
+  { id: "pl-tap", trade: "plumber", name: "Tap & mixer repair", desc: "Dripping spouts, cartridge replacement, reseating.", base: 129, hourly: 250, urgent: false, icon: Droplet, color: "blue" },
+  { id: "pl-block", trade: "plumber", name: "Blocked drain clearing", desc: "Sink, floor trap and toilet jetting and snaking.", base: 199, hourly: 300, urgent: true, icon: Waves, color: "blue" },
+  { id: "pl-tank", trade: "plumber", name: "Tank & flush repair", desc: "Flush valves, overflow, float valve, tank fittings.", base: 199, hourly: 300, urgent: false, icon: Timer, color: "blue" },
+  { id: "pl-pipe", trade: "plumber", name: "Hidden pipe leak trace", desc: "Pressure testing, wall leak localization, re-piping quote.", base: 299, hourly: 350, urgent: false, icon: Pipette, color: "blue" },
+  // Carpentry
+  { id: "ca-door", trade: "carpenter", name: "Door & lock alignment", desc: "Hinge fixes, latch replacement, monsoon swelling.", base: 199, hourly: 300, urgent: false, icon: DoorOpen, color: "amber" },
+  { id: "ca-furn", trade: "carpenter", name: "Furniture repair", desc: "Bed, chair, wardrobe joints, drawer channels.", base: 249, hourly: 350, urgent: false, icon: Sofa, color: "amber" },
+  { id: "ca-modular", trade: "carpenter", name: "Modular fittings", desc: "Cabinet handles, soft-close hinges, shelf brackets.", base: 179, hourly: 300, urgent: false, icon: Container, color: "amber" },
+  { id: "ca-measure", trade: "carpenter", name: "Custom build consultation", desc: "On-site measurement and quote for new woodwork.", base: 299, hourly: 0, urgent: false, icon: Ruler, color: "amber" },
+  // Masonry
+  { id: "ma-crack", trade: "mason", name: "Wall crack sealing", desc: "Structural crack fill, mesh reinforcement, curing.", base: 299, hourly: 350, urgent: false, icon: BrickWall, color: "forest" },
+  { id: "ma-water", trade: "mason", name: "Seepage & dampness fix", desc: "Terrace and bathroom waterproofing treatment.", base: 499, hourly: 400, urgent: false, icon: Waves, color: "forest" },
+  { id: "ma-tile", trade: "mason", name: "Tile replacement", desc: "Chipped floor and wall tiles, grout re-lining.", base: 249, hourly: 350, urgent: false, icon: Grid2x2, color: "forest" },
+  { id: "ma-plaster", trade: "mason", name: "Plaster patch work", desc: "Hole filling, corner beads, ceiling patch prep.", base: 249, hourly: 350, urgent: false, icon: Landmark, color: "forest" },
+  // Painting
+  { id: "pa-room", trade: "painter", name: "Single room repaint", desc: "Two-coat emulsion, putty prep, masking included.", base: 999, hourly: 0, urgent: false, icon: PaintBucket, color: "plum" },
+  { id: "pa-wall", trade: "painter", name: "Patch & touch-up", desc: "Stain covering, damp patch sealing, color match.", base: 299, hourly: 300, urgent: false, icon: Paintbrush, color: "plum" },
+  { id: "pa-texture", trade: "painter", name: "Texture & accent wall", desc: "Stencil, roller texture, geometric patterns.", base: 699, hourly: 0, urgent: false, icon: Layers, color: "plum" },
+  { id: "pa-waterproof", trade: "painter", name: "Waterproof coating", desc: "Exterior emulsion, terrace coats, anti-fungal.", base: 899, hourly: 0, urgent: false, icon: PaintRoller, color: "plum" },
+  // Appliance
+  { id: "ap-ac", trade: "appliance", name: "AC service & gas top-up", desc: "Jet wash, filter clean, cooling gas check.", base: 449, hourly: 350, urgent: false, icon: Wind, color: "teal" },
+  { id: "ap-fridge", trade: "appliance", name: "Refrigerator repair", desc: "Cooling fault, thermostat, compressor diagnostics.", base: 299, hourly: 350, urgent: true, icon: Refrigerator, color: "teal" },
+  { id: "ap-wm", trade: "appliance", name: "Washing machine repair", desc: "Drum noise, drainage, spin cycle, PCB faults.", base: 299, hourly: 350, urgent: false, icon: WashingMachine, color: "teal" },
+  { id: "ap-mw", trade: "appliance", name: "Microwave & oven fix", desc: "Magnetron, turntable, door switch issues.", base: 299, hourly: 350, urgent: false, icon: Microwave, color: "teal" },
+];
+
+export function getService(id: string): Service | undefined {
+  return SERVICES.find((s) => s.id === id);
+}
+
+export const COLOR_SOFT: Record<string, string> = {
+  saffron: "bg-saffron-soft text-saffron",
+  blue: "bg-blue-soft text-blue",
+  amber: "bg-warn-soft text-warn",
+  forest: "bg-forest-soft text-forest",
+  plum: "bg-plum-soft text-plum",
+  teal: "bg-teal-soft text-teal",
+  rose: "bg-rose-soft text-rose",
+  ok: "bg-ok-soft text-ok",
+};
+
+export const COLOR_TEXT: Record<string, string> = {
+  saffron: "text-saffron",
+  blue: "text-blue",
+  amber: "text-warn",
+  forest: "text-forest",
+  plum: "text-plum",
+  teal: "text-teal",
+  rose: "text-rose",
+  ok: "text-ok",
+};
 
 /* ---------------- Cooperative societies ---------------- */
 
@@ -345,7 +429,7 @@ export const QUIZ: Record<TradeId, QuizQuestion[]> = {
     },
     {
       icon: BatteryCharging,
-      options: [" swollen battery", "New cables", "Low battery level", "Charging slowly"],
+      options: ["Swollen battery", "New cables", "Low battery level", "Charging slowly"],
       answer: 0,
       explain: "A swollen battery is a fire hazard — isolate and replace safely.",
     },

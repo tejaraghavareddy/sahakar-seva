@@ -84,6 +84,14 @@
   --ok-soft: #e9f3ea;
   --warn: #b45309;
   --warn-soft: #fdf3e3;
+  --teal: #0f766e;
+  --teal-soft: #e6f4f2;
+  --plum: #6d28d9;
+  --plum-soft: #f1ecfb;
+  --blue: #1d4ed8;
+  --blue-soft: #e8eefc;
+  --rose: #be123c;
+  --rose-soft: #fdeaef;
   --grid-line: rgba(23, 32, 38, 0.05);
   --font-mono-stack: ui-monospace, "SFMono-Regular", "JetBrains Mono", Menlo,
     Consolas, "Liberation Mono", monospace;
@@ -98,6 +106,14 @@
   --color-ok-soft: var(--ok-soft);
   --color-warn: var(--warn);
   --color-warn-soft: var(--warn-soft);
+  --color-teal: var(--teal);
+  --color-teal-soft: var(--teal-soft);
+  --color-plum: var(--plum);
+  --color-plum-soft: var(--plum-soft);
+  --color-blue: var(--blue);
+  --color-blue-soft: var(--blue-soft);
+  --color-rose: var(--rose);
+  --color-rose-soft: var(--rose-soft);
   --font-mono: var(--font-mono-stack);
 }
 
@@ -258,6 +274,22 @@
   background: #aab4bd;
 }
 
+.tl-btn-saffron {
+  background: var(--saffron);
+  border-color: var(--saffron);
+  color: #ffffff;
+}
+.tl-btn-saffron:hover {
+  background: #c94e15;
+}
+.tl-btn-teal {
+  background: var(--teal);
+  border-color: var(--teal);
+  color: #ffffff;
+}
+.tl-btn-teal:hover {
+  background: #0d655e;
+}
 .dark {
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);

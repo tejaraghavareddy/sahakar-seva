@@ -51,6 +51,7 @@ interface ProfileForm {
   societyId: string;
   experienceYears: string;
   dailyRate: string;
+  upiVpa: string;
   idType: "aadhaar" | "voter";
   idNumber: string;
 }
@@ -64,6 +65,7 @@ const EMPTY_FORM: ProfileForm = {
   societyId: "",
   experienceYears: "",
   dailyRate: "",
+  upiVpa: "",
   idType: "aadhaar",
   idNumber: "",
 };
@@ -95,6 +97,7 @@ export default function Onboarding() {
       societyId: f.societyId || artisan.societyId,
       experienceYears: f.experienceYears || String(artisan.experienceYears),
       dailyRate: f.dailyRate || String(artisan.dailyRate),
+      upiVpa: f.upiVpa || artisan.upiVpa || "",
     }));
     setStep(() => {
       if (artisan.quizPassed) return 4;
@@ -142,6 +145,7 @@ export default function Onboarding() {
         societyId: form.societyId,
         experienceYears: Number(form.experienceYears) || 0,
         dailyRate: Number(form.dailyRate) || 0,
+        upiVpa: form.upiVpa || undefined,
         idType: form.idType,
         idNumber: form.idNumber,
       });
@@ -439,6 +443,15 @@ function StepProfile({
             </select>
           </Field>
         </div>
+
+        <Field label={t("f_upi")} hint={t("upi_missing")}>
+          <input
+            className="tl-input"
+            value={form.upiVpa}
+            onChange={(e) => update("upiVpa", e.target.value)}
+            placeholder={t("f_upi_ph")}
+          />
+        </Field>
 
         <Field label={t("f_idnumber")} hint={t("id_hint")}>
           <input
