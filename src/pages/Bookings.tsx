@@ -23,20 +23,22 @@ export default function Bookings() {
   const bookings = useQuery(api.bookings.listForCustomer, {}) ?? [];
 
   return (
-    <div className="tl-shell">
+    <div className="min-h-screen">
       <AppHeader />
       <main className="mx-auto w-full max-w-4xl px-4 py-8 sm:px-6">
-        <h1 className="text-2xl font-bold tracking-tight">{t("bks_title")}</h1>
+        <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900">
+          {t("bks_title")}
+        </h1>
 
         {bookings.length === 0 ? (
           <Panel className="mt-6">
             <div className="flex flex-col items-center gap-4 py-10 text-center">
-              <CalendarDays className="size-8 text-muted-foreground" />
-              <p className="max-w-sm text-sm text-muted-foreground">
-                {t("bks_empty")}
-              </p>
+              <span className="flex size-12 items-center justify-center rounded-2xl border border-emerald-200 bg-emerald-50">
+                <CalendarDays className="size-5 text-emerald-700" />
+              </span>
+              <p className="max-w-sm text-sm text-slate-600">{t("bks_empty")}</p>
               <Link to="/services">
-                <TlButton variant="saffron" className="tl-btn-saffron">
+                <TlButton>
                   {t("bks_browse")}
                   <ArrowRight className="size-4" />
                 </TlButton>
@@ -50,19 +52,22 @@ export default function Bookings() {
               const Icon = svc?.icon;
               const soft = COLOR_SOFT[svc?.color ?? "ok"];
               return (
-                <Link key={b._id} to={`/bookings/${b._id}`}>
-                  <Panel bodyClassName="p-4" className="transition-shadow hover:shadow-md">
+                <Link key={b._id} to={`/bookings/${b._id}`} className="block">
+                  <Panel
+                    bodyClassName="p-4"
+                    className="transition hover:border-emerald-300"
+                  >
                     <div className="flex items-center gap-4">
                       <span
-                        className={`flex size-10 shrink-0 items-center justify-center rounded-sm ${soft}`}
+                        className={`flex size-10 shrink-0 items-center justify-center rounded-xl border ${soft}`}
                       >
                         {Icon && <Icon className="size-5" />}
                       </span>
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-bold">
+                        <p className="truncate text-sm font-bold text-slate-900">
                           {b.serviceName}
                         </p>
-                        <p className="truncate text-xs text-muted-foreground">
+                        <p className="truncate text-xs text-slate-500">
                           {new Date(b.scheduledFor).toLocaleString("en-IN", {
                             dateStyle: "medium",
                             timeStyle: "short",
@@ -75,7 +80,9 @@ export default function Bookings() {
                         <MonoBadge tone={STATUS_TONE[b.status] ?? "neutral"}>
                           {t(`st_${b.status}`)}
                         </MonoBadge>
-                        <p className="mt-1 text-sm font-bold">₹{b.total}</p>
+                        <p className="mt-1 text-sm font-bold text-slate-900">
+                          ₹{b.total}
+                        </p>
                       </div>
                     </div>
                   </Panel>

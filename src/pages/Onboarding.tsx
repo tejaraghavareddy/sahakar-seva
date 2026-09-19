@@ -33,6 +33,7 @@ import {
   ArrowRight,
   BadgeCheck,
   Check,
+  HandHeart,
   Loader2,
   Mic,
   ShieldCheck,
@@ -158,14 +159,14 @@ export default function Onboarding() {
   }
 
   return (
-    <div className="tl-shell">
-      <header className="tl-band sticky top-0 z-40">
+    <div className="min-h-screen">
+      <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur">
         <div className="mx-auto flex h-14 w-full max-w-3xl items-center justify-between px-4 sm:px-6">
           <Link to="/" className="flex items-center gap-2">
-            <span className="flex size-7 items-center justify-center rounded-sm border border-foreground bg-foreground text-xs font-bold text-background">
-              &gt;_
+            <span className="flex size-7 items-center justify-center rounded-lg bg-emerald-800 text-white">
+              <HandHeart className="size-4" />
             </span>
-            <span className="text-sm font-bold">sahakar-seva</span>
+            <span className="text-sm font-bold text-slate-900">Sahakar Seva</span>
           </Link>
           <LanguagePicker />
         </div>
@@ -175,7 +176,7 @@ export default function Onboarding() {
         <SectionHeader title={t("ob_title")} sub={t("ob_sub")} />
 
         {/* Step rail */}
-        <div className="mt-5 grid grid-cols-4 gap-px overflow-hidden rounded-sm border border-border bg-border">
+        <div className="mt-5 grid grid-cols-4 gap-2">
           {(
             [
               [1, t("step_profile")],
@@ -189,17 +190,19 @@ export default function Onboarding() {
             return (
               <div
                 key={n}
-                className={`bg-card px-2 py-2.5 text-center ${
-                  active ? "outline outline-2 -outline-offset-2 outline-ok" : ""
+                className={`rounded-xl border px-2 py-2.5 text-center transition ${
+                  active
+                    ? "border-emerald-600 bg-emerald-50"
+                    : "border-slate-200 bg-white"
                 }`}
               >
                 <div className="flex items-center justify-center gap-1.5">
                   {done ? (
-                    <Check className="size-3 text-ok" />
+                    <Check className="size-3 text-emerald-600" />
                   ) : (
                     <span
                       className={`text-[10px] font-bold ${
-                        active ? "text-ok" : "text-muted-foreground"
+                        active ? "text-emerald-700" : "text-slate-400"
                       }`}
                     >
                       {n}
@@ -207,7 +210,9 @@ export default function Onboarding() {
                   )}
                   <span
                     className={`text-[10px] uppercase tracking-wider ${
-                      active || done ? "font-bold" : "text-muted-foreground"
+                      active || done
+                        ? "font-bold text-slate-900"
+                        : "text-slate-400"
                     }`}
                   >
                     {label}
@@ -304,7 +309,7 @@ function StepProfile({
   t: TT;
 }) {
   return (
-    <Panel title="$ profile --init" tag="step 1/4">
+    <Panel tag="step 1/4">
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -347,16 +352,16 @@ function StepProfile({
                     update("trade", trade.id);
                     update("dailyRate", String(trade.baseRate));
                   }}
-                  className={`flex items-center gap-2 rounded-sm border px-3 py-2.5 text-left text-xs font-semibold transition-colors ${
+                  className={`flex items-center gap-2 rounded-xl border px-3 py-2.5 text-left text-xs font-semibold capitalize transition ${
                     active
-                      ? "border-ok bg-ok-soft text-forest"
-                      : "border-input bg-card hover:bg-secondary"
+                      ? "border-emerald-600 bg-emerald-50 text-emerald-800"
+                      : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
                   }`}
-                >
-                  <Icon
+                >                  <Icon
                     className={`size-4 ${
-                      active ? "text-ok" : "text-muted-foreground"
-                    }`}
+                      active ? "text-emerald-700" : "text-slate-400"
+                    }`
+                  }
                   />
                   {trade.id}
                 </button>
@@ -465,7 +470,7 @@ function StepProfile({
         </Field>
 
         {error && (
-          <p className="rounded-sm border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+          <p className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700">
             {error}
           </p>
         )}
@@ -502,16 +507,16 @@ function StepKyc({
   t: TT;
 }) {
   return (
-    <Panel title="$ verify --identity" tag="step 2/4">
+    <Panel tag="step 2/4">
       <div className="flex flex-col items-center py-6 text-center">
-        <span className="flex size-14 items-center justify-center rounded-full border border-ok/30 bg-ok-soft">
-          <ShieldCheck className="size-7 text-ok" />
+        <span className="flex size-14 items-center justify-center rounded-2xl border border-emerald-200 bg-emerald-50">
+          <ShieldCheck className="size-7 text-emerald-700" />
         </span>
-        <h3 className="mt-4 text-lg font-bold">{t("kyc_title")}</h3>
-        <p className="mt-1 max-w-md text-xs leading-5 text-muted-foreground">
+        <h3 className="mt-4 text-lg font-extrabold text-slate-900">{t("kyc_title")}</h3>
+        <p className="mt-1 max-w-md text-sm leading-6 text-slate-600">
           {t("kyc_desc")}
         </p>
-        <div className="mt-5 w-full max-w-sm space-y-1.5 rounded-sm border border-border bg-secondary/40 p-4 text-xs">
+        <div className="mt-5 w-full max-w-sm space-y-1.5 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs">
           <Row label={t("kyc_masked")} value={`XXXX XXXX ${artisan.idLast4}`} />
           <Row label={t("kyc_ref")} value={artisan.kycRef ?? "—"} />
           <Row
@@ -623,8 +628,8 @@ function StepQuiz({
   if (!q) return null;
 
   return (
-    <Panel title="$ skill-test --voice" tag="step 3/4">
-      <p className="text-xs text-muted-foreground">
+    <Panel tag="step 3/4">
+      <p className="text-sm text-slate-600">
         {t("quiz_sub", { pass: QUIZ_PASS_MARK })}
       </p>
 
@@ -635,10 +640,10 @@ function StepQuiz({
             key={i}
             className={`h-1.5 flex-1 rounded-full ${
               answers[i] !== undefined
-                ? "bg-ok"
+                ? "bg-emerald-600"
                 : i === idx
-                  ? "bg-foreground"
-                  : "bg-border"
+                  ? "bg-emerald-800"
+                  : "bg-slate-200"
             }`}
           />
         ))}
@@ -676,8 +681,8 @@ function StepQuiz({
           </div>
 
           {/* Pictorial question */}
-          <div className="mt-3 flex flex-col items-center rounded-sm border border-border bg-secondary/40 py-6">
-            <q.icon className="size-12 text-forest" strokeWidth={1.5} />
+          <div className="mt-3 flex flex-col items-center rounded-2xl border border-slate-200 bg-slate-50 py-6">
+            <q.icon className="size-12 text-emerald-800" strokeWidth={1.5} />
           </div>
 
           <div className="mt-4 grid gap-2 sm:grid-cols-2">
@@ -688,17 +693,17 @@ function StepQuiz({
                   type="button"
                   key={i}
                   onClick={() => handleSelect(i)}
-                  className={`flex items-center gap-2.5 rounded-sm border px-3.5 py-3 text-left text-xs font-semibold transition-colors ${
+                  className={`flex items-center gap-2.5 rounded-xl border px-3.5 py-3 text-left text-xs font-semibold transition ${
                     selected
-                      ? "border-ok bg-ok-soft text-forest"
-                      : "border-input bg-card hover:bg-secondary"
+                      ? "border-emerald-600 bg-emerald-50 text-emerald-800"
+                      : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
                   }`}
                 >
                   <span
-                    className={`flex size-5 shrink-0 items-center justify-center rounded-sm border text-[10px] font-bold ${
+                    className={`flex size-5 shrink-0 items-center justify-center rounded-full border text-[10px] font-bold ${
                       selected
-                        ? "border-ok bg-ok text-white"
-                        : "border-input text-muted-foreground"
+                        ? "border-emerald-600 bg-emerald-600 text-white"
+                        : "border-slate-200 text-slate-400"
                     }`}
                   >
                     {String.fromCharCode(65 + i)}
@@ -715,23 +720,27 @@ function StepQuiz({
               type="button"
               disabled={!stt}
               onClick={startListening}
-              className={`flex size-12 items-center justify-center rounded-full border transition-colors ${
+              className={`flex size-12 items-center justify-center rounded-full border transition ${
                 listening
-                  ? "border-warn bg-warn-soft text-warn tl-blink"
-                  : "border-foreground bg-foreground text-background hover:bg-foreground/90"
+                  ? "border-amber-400 bg-amber-100 text-amber-700 tl-blink"
+                  : "border-emerald-600 bg-emerald-600 text-white hover:bg-emerald-700"
               } ${!stt ? "opacity-40" : ""}`}
             >
               <Mic className="size-5" />
             </button>
-            <p className="text-[10px] text-muted-foreground">
+            <p className="text-[11px] text-slate-500">
               {listening ? t("quiz_listening") : t("quiz_mic")}
             </p>
             {heard && (
-              <p className="text-[10px] text-ok">
+              <p className="text-[11px] font-semibold text-emerald-700">
                 {t("quiz_heard", { text: heard })}
               </p>
             )}
-            {micError && <p className="text-[10px] text-warn">{micError}</p>}
+            {micError && (
+              <p className="text-[11px] font-semibold text-amber-700">
+                {micError}
+              </p>
+            )}
           </div>
         </motion.div>
       </AnimatePresence>
@@ -775,7 +784,7 @@ function StepQuiz({
       </div>
 
       {quizError && (
-        <div className="mt-3 rounded-sm border border-warn/40 bg-warn-soft px-3 py-2 text-xs text-warn">
+        <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">
           {quizError}
         </div>
       )}
@@ -795,19 +804,19 @@ function StepCredential({
   t: TT;
 }) {
   return (
-    <Panel title="$ credential --issue" tag="step 4/4">
+    <Panel tag="step 4/4">
       <div className="flex flex-col items-center py-4 text-center">
         <motion.span
           initial={{ scale: 0.6, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           transition={{ type: "spring", stiffness: 260, damping: 18 }}
-          className="flex size-16 items-center justify-center rounded-full border border-ok/30 bg-ok-soft"
+          className="flex size-16 items-center justify-center rounded-2xl border border-emerald-200 bg-emerald-50"
         >
-          <BadgeCheck className="size-8 text-ok" />
+          <BadgeCheck className="size-8 text-emerald-700" />
         </motion.span>
-        <h3 className="mt-4 text-lg font-bold">{t("cred_title")}</h3>
-        <p className="mt-1 text-xs text-muted-foreground">{t("cred_sub")}</p>
-        <div className="mt-5 w-full max-w-sm space-y-1.5 rounded-sm border border-border bg-secondary/40 p-4 text-xs">
+        <h3 className="mt-4 text-lg font-extrabold text-slate-900">{t("cred_title")}</h3>
+        <p className="mt-1 text-sm text-slate-600">{t("cred_sub")}</p>
+        <div className="mt-5 w-full max-w-sm space-y-1.5 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs">
           <Row label={t("cred_id")} value={artisan.credentialId ?? "—"} />
           <Row label={t("cred_score")} value={`${artisan.quizScore ?? 0}%`} />
           <Row
@@ -895,8 +904,8 @@ function Field({
 function Row({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between gap-3">
-      <span className="text-muted-foreground">{label}</span>
-      <span className="font-semibold">{value}</span>
+      <span className="text-slate-500">{label}</span>
+      <span className="font-semibold text-slate-900">{value}</span>
     </div>
   );
 }

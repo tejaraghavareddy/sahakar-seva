@@ -2,7 +2,7 @@ import { Link } from "react-router";
 import { useAuth } from "@/hooks/use-auth";
 import { useLang } from "@/lib/i18n";
 import { LanguagePicker, TlButton } from "@/components/terminal";
-import { LogOut, Terminal } from "lucide-react";
+import { HandHeart, LogOut } from "lucide-react";
 
 export function AppHeader() {
   const { t } = useLang();
@@ -16,14 +16,14 @@ export function AppHeader() {
   ];
 
   return (
-    <header className="tl-band sticky top-0 z-40">
+    <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur">
       <div className="mx-auto flex h-14 w-full max-w-6xl items-center justify-between gap-3 px-4 sm:px-6">
-        <Link to="/" className="flex shrink-0 items-center gap-2.5">
-          <span className="flex size-7 items-center justify-center rounded-sm border border-foreground bg-foreground text-xs font-bold text-background">
-            &gt;_
+        <Link to="/" className="flex shrink-0 items-center gap-2">
+          <span className="flex size-7 items-center justify-center rounded-lg bg-emerald-800 text-white">
+            <HandHeart className="size-4" />
           </span>
-          <span className="hidden text-sm font-bold tracking-tight sm:inline">
-            sahakar-seva
+          <span className="text-sm font-bold tracking-tight text-slate-900">
+            Sahakar Seva
           </span>
         </Link>
         <nav className="hidden items-center gap-1 md:flex">
@@ -31,7 +31,7 @@ export function AppHeader() {
             <Link
               key={l.to}
               to={l.to}
-              className="rounded-sm px-3 py-1.5 text-xs font-semibold text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+              className="rounded-xl px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-emerald-50 hover:text-emerald-800"
             >
               {l.label}
             </Link>
@@ -39,18 +39,24 @@ export function AppHeader() {
         </nav>
         <div className="flex items-center gap-2">
           <LanguagePicker />
-          <TlButton variant="ghost" onClick={() => void signOut()}>
-            <LogOut className="size-4" />
-          </TlButton>
+          {user && (
+            <TlButton
+              variant="ghost"
+              onClick={() => void signOut()}
+              title={t("nav_signout")}
+            >
+              <LogOut className="size-4" />
+            </TlButton>
+          )}
         </div>
       </div>
       {/* mobile nav */}
-      <nav className="flex items-center justify-center gap-1 border-t border-border px-2 py-1.5 md:hidden">
+      <nav className="flex items-center justify-center gap-1 border-t border-slate-100 px-2 py-1.5 md:hidden">
         {links.map((l) => (
           <Link
             key={l.to}
             to={l.to}
-            className="rounded-sm px-2.5 py-1 text-[11px] font-semibold text-muted-foreground hover:bg-secondary hover:text-foreground"
+            className="rounded-xl px-2.5 py-1 text-[11px] font-semibold text-slate-600 hover:bg-emerald-50 hover:text-emerald-800"
           >
             {l.label}
           </Link>
@@ -59,5 +65,3 @@ export function AppHeader() {
     </header>
   );
 }
-
-export { Terminal as _TerminalIcon };

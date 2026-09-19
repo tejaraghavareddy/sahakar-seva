@@ -5,8 +5,15 @@ import { api } from "@/convex/_generated/api";
 import { useLang } from "@/lib/i18n";
 import { getService, COLOR_SOFT } from "@/lib/trades";
 import { AppHeader } from "@/components/AppHeader";
-import { MonoBadge, Panel, SectionHeader, TlButton } from "@/components/terminal";
-import { ArrowLeft, ArrowRight, CalendarDays, Loader2, MapPin, Zap } from "lucide-react";
+import { MonoBadge, Panel, TlButton } from "@/components/terminal";
+import {
+  ArrowLeft,
+  ArrowRight,
+  Loader2,
+  MapPin,
+  HeartHandshake,
+  Zap,
+} from "lucide-react";
 
 const SLOTS = [
   "09:00",
@@ -50,10 +57,10 @@ export default function Book() {
 
   if (!svc) {
     return (
-      <div className="tl-shell">
+      <div className="min-h-screen">
         <AppHeader />
         <main className="mx-auto max-w-3xl px-4 py-16 text-center sm:px-6">
-          <p className="text-sm text-muted-foreground">Service not found.</p>
+          <p className="text-sm text-slate-500">Service not found.</p>
           <Link to="/services" className="mt-4 inline-block">
             <TlButton variant="outline">{t("bks_browse")}</TlButton>
           </Link>
@@ -95,18 +102,18 @@ export default function Book() {
   }
 
   return (
-    <div className="tl-shell">
+    <div className="min-h-screen">
       <AppHeader />
       <main className="mx-auto w-full max-w-3xl px-4 py-8 sm:px-6">
         <Link
           to={`/services/${svc.id}`}
-          className="inline-flex items-center gap-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground"
+          className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 transition hover:text-emerald-700"
         >
           <ArrowLeft className="size-3.5" />
           {svc.name}
         </Link>
 
-        <h1 className="mt-4 text-2xl font-bold tracking-tight">
+        <h1 className="mt-4 text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900">
           {t("bk_title")}
         </h1>
 
@@ -115,13 +122,15 @@ export default function Book() {
           <Panel>
             <div className="flex items-center gap-4">
               <span
-                className={`flex size-11 shrink-0 items-center justify-center rounded-sm ${soft}`}
+                className={`flex size-11 shrink-0 items-center justify-center rounded-xl border ${soft}`}
               >
                 <Icon className="size-5" />
               </span>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-bold">{svc.name}</p>
-                <p className="text-xs text-muted-foreground">
+                <p className="truncate text-sm font-bold text-slate-900">
+                  {svc.name}
+                </p>
+                <p className="text-xs text-slate-500">
                   ₹{svc.base} {t("sv_base")}
                   {svc.hourly > 0 ? ` + ₹${svc.hourly} ${t("sv_hourly")}` : ""}
                 </p>
@@ -137,9 +146,9 @@ export default function Book() {
           {/* Address */}
           <Panel title={t("bk_address")}>
             <div className="relative">
-              <MapPin className="absolute left-3 top-3 size-4 text-muted-foreground" />
+              <MapPin className="absolute left-3 top-3 size-4 text-slate-400" />
               <textarea
-                className="min-h-[70px] w-full rounded-sm border border-input bg-card py-2.5 pl-9 pr-3 text-[13px] focus:outline-none focus:ring-2 focus:ring-ok/40"
+                className="min-h-[70px] w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-sm text-slate-900 transition placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
                 placeholder={t("bk_address_ph")}
                 value={address}
                 onChange={(e) => setAddress(e.target.value)}
@@ -155,13 +164,13 @@ export default function Book() {
                   key={i}
                   type="button"
                   onClick={() => setDateIdx(i)}
-                  className={`flex min-w-[64px] flex-col items-center rounded-sm border px-3 py-2.5 text-center transition-colors ${
+                  className={`flex min-w-[64px] flex-col items-center rounded-xl border px-3 py-2.5 text-center transition ${
                     dateIdx === i
-                      ? "border-foreground bg-foreground text-background"
-                      : "border-input bg-card hover:bg-secondary"
+                      ? "border-emerald-600 bg-emerald-600 text-white"
+                      : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
                   }`}
                 >
-                  <span className="text-[9px] uppercase tracking-wider opacity-70">
+                  <span className="text-[9px] font-semibold uppercase tracking-wider opacity-70">
                     {d.toLocaleDateString("en-IN", { weekday: "short" })}
                   </span>
                   <span className="text-lg font-bold">{d.getDate()}</span>
@@ -181,10 +190,10 @@ export default function Book() {
                     setSlot(s);
                     setAsap(false);
                   }}
-                  className={`rounded-sm border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                  className={`rounded-xl border px-3 py-1.5 text-xs font-semibold transition ${
                     slot === s && !asap
-                      ? "border-foreground bg-foreground text-background"
-                      : "border-input bg-card hover:bg-secondary"
+                      ? "border-emerald-600 bg-emerald-600 text-white"
+                      : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
                   }`}
                 >
                   {s}
@@ -196,10 +205,10 @@ export default function Book() {
               <button
                 type="button"
                 onClick={() => setAsap((v) => !v)}
-                className={`mt-4 flex w-full items-center justify-between rounded-sm border px-4 py-3 text-left text-xs font-semibold transition-colors ${
+                className={`mt-4 flex w-full items-center justify-between rounded-xl border px-4 py-3 text-left text-xs font-bold transition ${
                   asap
-                    ? "border-warn bg-warn-soft text-warn"
-                    : "border-input bg-card hover:bg-secondary"
+                    ? "border-rose-600 bg-rose-600 text-white"
+                    : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
                 }`}
               >
                 <span className="flex items-center gap-2">
@@ -207,12 +216,12 @@ export default function Book() {
                   {t("bk_asap")}
                 </span>
                 <span
-                  className={`h-5 w-9 rounded-full border transition-colors ${
-                    asap ? "border-warn bg-warn" : "border-input bg-secondary"
-                  } relative`}
+                  className={`relative h-5 w-9 rounded-full border transition-colors ${
+                    asap ? "border-white/50 bg-white/30" : "border-slate-200 bg-slate-100"
+                  }`}
                 >
                   <span
-                    className={`absolute top-0.5 size-4 rounded-full bg-white transition-all ${
+                    className={`absolute top-0.5 size-4 rounded-full bg-white shadow transition-all ${
                       asap ? "left-[18px]" : "left-0.5"
                     }`}
                   />
@@ -224,7 +233,7 @@ export default function Book() {
           {/* Notes */}
           <Panel title={t("bk_notes")}>
             <textarea
-              className="min-h-[60px] w-full rounded-sm border border-input bg-card px-3 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-ok/40"
+              className="min-h-[60px] w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 transition placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
               placeholder={t("bk_notes_ph")}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
@@ -232,27 +241,36 @@ export default function Book() {
           </Panel>
 
           {/* Welfare */}
-          <button type="button" onClick={() => setWelfare((v) => !v)} className="text-left">
+          <button
+            type="button"
+            onClick={() => setWelfare((v) => !v)}
+            className="text-left"
+          >
             <Panel
-              className={welfare ? "border-ok/50 bg-ok-soft/40" : ""}
+              className={
+                welfare ? "border-orange-300 bg-orange-50" : "hover:border-emerald-300"
+              }
               bodyClassName="p-4"
             >
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-xs font-bold text-forest">
+                  <p className="flex items-center gap-1.5 text-xs font-bold text-orange-800">
+                    <HeartHandshake className="size-4" />
                     {t("bk_welfare", { amt: Math.round(svc.base * 0.03) })}
                   </p>
-                  <p className="mt-0.5 text-[10px] text-muted-foreground">
+                  <p className="mt-0.5 text-[11px] leading-4 text-slate-600">
                     {t("bk_welfare_desc")}
                   </p>
                 </div>
                 <span
                   className={`relative h-5 w-9 shrink-0 rounded-full border transition-colors ${
-                    welfare ? "border-ok bg-ok" : "border-input bg-secondary"
+                    welfare
+                      ? "border-orange-600 bg-orange-600"
+                      : "border-slate-200 bg-slate-100"
                   }`}
                 >
                   <span
-                    className={`absolute top-0.5 size-4 rounded-full bg-white transition-all ${
+                    className={`absolute top-0.5 size-4 rounded-full bg-white shadow transition-all ${
                       welfare ? "left-[18px]" : "left-0.5"
                     }`}
                   />
@@ -263,40 +281,31 @@ export default function Book() {
 
           {/* Price summary */}
           <Panel title={t("bk_summary")}>
-            <div className="space-y-1.5 text-xs">
+            <div className="space-y-1.5 text-sm">
               <div className="flex justify-between">
-                <span className="text-muted-foreground">{t("bk_visit")}</span>
-                <span className="font-semibold">₹{svc.base}</span>
+                <span className="text-slate-500">{t("bk_visit")}</span>
+                <span className="font-semibold text-slate-900">₹{svc.base}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">
-                  {t("bk_welfare_row")}
-                </span>
-                <span className="font-semibold">
+                <span className="text-slate-500">{t("bk_welfare_row")}</span>
+                <span className="font-semibold text-slate-900">
                   {welfareAmt > 0 ? `₹${welfareAmt}` : "—"}
                 </span>
               </div>
-              <div className="flex justify-between border-t border-dashed border-border pt-2 text-sm">
-                <span className="font-bold">{t("bk_total")}</span>
-                <span className="font-bold">₹{total}</span>
+              <div className="flex justify-between border-t border-dashed border-slate-200 pt-2">
+                <span className="font-bold text-slate-900">{t("bk_total")}</span>
+                <span className="font-bold text-slate-900">₹{total}</span>
               </div>
             </div>
-            <p className="mt-2 text-[10px] text-muted-foreground">
-              {t("bd_upi_note")}
-            </p>
+            <p className="mt-2 text-[11px] text-slate-400">{t("bd_upi_note")}</p>
 
             {error && (
-              <p className="mt-3 rounded-sm border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+              <p className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700">
                 {error}
               </p>
             )}
 
-            <TlButton
-              variant="saffron"
-              className="tl-btn-saffron mt-4 w-full"
-              onClick={submit}
-              disabled={busy}
-            >
+            <TlButton className="mt-4 w-full" onClick={submit} disabled={busy}>
               {busy ? (
                 <Loader2 className="size-4 animate-spin" />
               ) : (

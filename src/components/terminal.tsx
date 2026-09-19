@@ -9,7 +9,7 @@ import {
   type ReactNode,
 } from "react";
 
-/* ---------- Status dot (green/amber only) ---------- */
+/* ---------- Status dot ---------- */
 
 export function StatusDot({
   tone = "ok",
@@ -23,16 +23,16 @@ export function StatusDot({
       aria-hidden
       className={cn(
         "inline-block size-2 rounded-full",
-        tone === "ok" && "bg-ok",
-        tone === "warn" && "bg-warn",
-        tone === "idle" && "bg-border",
+        tone === "ok" && "bg-emerald-600",
+        tone === "warn" && "bg-amber-500",
+        tone === "idle" && "bg-slate-300",
         blink && "tl-blink",
       )}
     />
   );
 }
 
-/* ---------- Mono badge ---------- */
+/* ---------- Badge ---------- */
 
 export function MonoBadge({
   children,
@@ -46,12 +46,13 @@ export function MonoBadge({
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1 rounded-sm border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider",
-        tone === "neutral" && "border-border bg-secondary text-muted-foreground",
-        tone === "ok" && "border-ok/30 bg-ok-soft text-ok",
-        tone === "warn" && "border-warn/30 bg-warn-soft text-warn",
-        tone === "saffron" && "border-saffron/30 bg-saffron-soft text-saffron",
-        tone === "forest" && "border-forest/25 bg-forest-soft text-forest",
+        "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold",
+        tone === "neutral" &&
+          "border-slate-200 bg-slate-50 text-slate-600",
+        tone === "ok" && "border-emerald-200 bg-emerald-50 text-emerald-800",
+        tone === "warn" && "border-amber-200 bg-amber-50 text-amber-800",
+        tone === "saffron" && "border-orange-200 bg-orange-50 text-orange-800",
+        tone === "forest" && "border-emerald-200 bg-emerald-50 text-emerald-900",
         className,
       )}
     >
@@ -60,7 +61,7 @@ export function MonoBadge({
   );
 }
 
-/* ---------- Terminal panel ---------- */
+/* ---------- Panel (white civic card) ---------- */
 
 export function Panel({
   title,
@@ -76,12 +77,19 @@ export function Panel({
   bodyClassName?: string;
 }) {
   return (
-    <section className={cn("tl-panel overflow-hidden", className)}>
+    <section
+      className={cn(
+        "rounded-2xl border border-slate-200 bg-white shadow-xs",
+        className,
+      )}
+    >
       {(title || tag) && (
-        <header className="flex items-center justify-between border-b border-border bg-secondary/50 px-4 py-2.5">
+        <header className="flex items-center justify-between border-b border-slate-200 px-4 py-2.5">
           <span className="tl-label">{title}</span>
           {tag && (
-            <span className="text-[10px] text-muted-foreground">{tag}</span>
+            <span className="text-[10px] font-semibold text-slate-400">
+              {tag}
+            </span>
           )}
         </header>
       )}
@@ -105,18 +113,18 @@ export function SectionHeader({
     <div className="flex flex-col gap-1">
       <div className="flex items-center gap-2">
         {index && (
-          <span className="text-[11px] font-bold text-saffron">{index}</span>
+          <span className="text-xs font-bold text-emerald-700">{index}</span>
         )}
-        <h2 className="text-base font-bold tracking-tight text-foreground">
+        <h2 className="text-base sm:text-lg font-bold tracking-tight text-slate-900">
           {title}
         </h2>
       </div>
-      {sub && <p className="text-xs text-muted-foreground">{sub}</p>}
+      {sub && <p className="text-sm text-slate-500">{sub}</p>}
     </div>
   );
 }
 
-/* ---------- Terminal button ---------- */
+/* ---------- Button ---------- */
 
 interface TlButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: "primary" | "outline" | "ghost" | "ok" | "saffron";
@@ -131,17 +139,15 @@ export function TlButton({
   return (
     <button
       className={cn(
-        "inline-flex h-10 items-center justify-center gap-2 rounded-sm border px-4 text-[13px] font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50",
+        "inline-flex h-10 items-center justify-center gap-2 rounded-xl px-4 text-sm font-bold transition active:scale-95 disabled:pointer-events-none disabled:opacity-50",
         variant === "primary" &&
-          "border-foreground bg-foreground text-background hover:bg-foreground/90",
-        variant === "ok" &&
-          "border-ok bg-ok text-white hover:bg-ok/90",
-        variant === "saffron" &&
-          "tl-btn-saffron",
+          "bg-emerald-600 text-white hover:bg-emerald-700",
+        variant === "ok" && "bg-emerald-600 text-white hover:bg-emerald-700",
+        variant === "saffron" && "tl-btn-saffron",
         variant === "outline" &&
-          "border-input bg-card text-foreground hover:bg-secondary",
+          "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50",
         variant === "ghost" &&
-          "border-transparent bg-transparent text-muted-foreground hover:bg-secondary hover:text-foreground",
+          "bg-transparent text-slate-500 hover:bg-slate-100 hover:text-slate-900",
         className,
       )}
       {...props}
@@ -175,20 +181,20 @@ export function LanguagePicker({ compact = false }: { compact?: boolean }) {
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="inline-flex h-8 items-center gap-1.5 rounded-sm border border-input bg-card px-2.5 text-xs font-semibold text-foreground hover:bg-secondary"
+        className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
         aria-haspopup="listbox"
         aria-expanded={open}
       >
-        <span className="text-[10px] font-bold text-muted-foreground">
-          {compact ? "" : "lang"}
+        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+          {compact ? "" : "Lang"}
         </span>
         <span>{current.label}</span>
-        <ChevronDown className="size-3 text-muted-foreground" />
+        <ChevronDown className="size-3 text-slate-400" />
       </button>
       {open && (
         <div
           role="listbox"
-          className="absolute right-0 z-50 mt-1 w-40 overflow-hidden rounded-sm border border-border bg-popover py-1 shadow-lg"
+          className="absolute right-0 z-50 mt-1.5 w-44 overflow-hidden rounded-2xl border border-slate-200 bg-white py-1 shadow-lg"
         >
           {LANGS.map((l) => (
             <button
@@ -201,13 +207,11 @@ export function LanguagePicker({ compact = false }: { compact?: boolean }) {
                 setOpen(false);
               }}
               className={cn(
-                "flex w-full items-center justify-between px-3 py-2 text-left text-xs hover:bg-secondary",
-                l.code === lang && "text-ok",
+                "flex w-full items-center justify-between px-3.5 py-2 text-left text-xs font-medium text-slate-700 hover:bg-emerald-50",
+                l.code === lang && "font-bold text-emerald-800",
               )}
             >
-              <span className={cn(l.code === lang && "font-bold")}>
-                {l.label}
-              </span>
+              <span>{l.label}</span>
               {l.code === lang && <Check className="size-3" />}
             </button>
           ))}

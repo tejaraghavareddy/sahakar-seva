@@ -122,25 +122,25 @@ export function getService(id: string): Service | undefined {
 }
 
 export const COLOR_SOFT: Record<string, string> = {
-  saffron: "bg-saffron-soft text-saffron",
-  blue: "bg-blue-soft text-blue",
-  amber: "bg-warn-soft text-warn",
-  forest: "bg-forest-soft text-forest",
-  plum: "bg-plum-soft text-plum",
-  teal: "bg-teal-soft text-teal",
-  rose: "bg-rose-soft text-rose",
-  ok: "bg-ok-soft text-ok",
+  saffron: "border-amber-200 bg-amber-50 text-amber-700",
+  blue: "border-blue-200 bg-blue-50 text-blue-700",
+  amber: "border-orange-200 bg-orange-50 text-orange-700",
+  forest: "border-emerald-200 bg-emerald-50 text-emerald-800",
+  plum: "border-violet-200 bg-violet-50 text-violet-700",
+  teal: "border-teal-200 bg-teal-50 text-teal-700",
+  rose: "border-rose-200 bg-rose-50 text-rose-700",
+  ok: "border-emerald-200 bg-emerald-50 text-emerald-700",
 };
 
 export const COLOR_TEXT: Record<string, string> = {
-  saffron: "text-saffron",
-  blue: "text-blue",
-  amber: "text-warn",
-  forest: "text-forest",
-  plum: "text-plum",
-  teal: "text-teal",
-  rose: "text-rose",
-  ok: "text-ok",
+  saffron: "text-amber-700",
+  blue: "text-blue-700",
+  amber: "text-orange-700",
+  forest: "text-emerald-800",
+  plum: "text-violet-700",
+  teal: "text-teal-700",
+  rose: "text-rose-700",
+  ok: "text-emerald-700",
 };
 
 /* ---------------- Cooperative societies ---------------- */

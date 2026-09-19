@@ -16,7 +16,7 @@ import {
 import { LanguagePicker } from "@/components/terminal";
 import { useAuth } from "@/hooks/use-auth";
 import { useLang } from "@/lib/i18n";
-import { ArrowRight, Loader2, Mail, UserX } from "lucide-react";
+import { ArrowRight, HandHeart, Loader2, Mail, UserX } from "lucide-react";
 import { Suspense, useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
 
@@ -104,15 +104,15 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
   };
 
   return (
-    <div className="tl-shell flex flex-col">
+    <div className="flex min-h-screen flex-col">
       {/* Top band */}
-      <header className="tl-band sticky top-0 z-40">
+      <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur">
         <div className="mx-auto flex h-14 w-full max-w-3xl items-center justify-between px-4 sm:px-6">
           <Link to="/" className="flex items-center gap-2">
-            <span className="flex size-7 items-center justify-center rounded-sm border border-foreground bg-foreground text-xs font-bold text-background">
-              &gt;_
+            <span className="flex size-7 items-center justify-center rounded-lg bg-emerald-800 text-white">
+              <HandHeart className="size-4" />
             </span>
-            <span className="text-sm font-bold">sahakar-seva</span>
+            <span className="text-sm font-bold text-slate-900">Sahakar Seva</span>
           </Link>
           <LanguagePicker />
         </div>
@@ -120,14 +120,14 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
 
       {/* Auth content */}
       <div className="tl-glow flex flex-1 items-center justify-center px-4 py-12">
-        <Card className="w-full max-w-sm overflow-hidden pt-0 shadow-md">
+        <Card className="w-full max-w-sm overflow-hidden rounded-3xl border-slate-200 pt-0 shadow-sm">
           {step === "signIn" ? (
             <>
               <CardHeader className="text-center">
-                <div className="mx-auto mb-1 flex size-10 items-center justify-center rounded-sm border border-foreground bg-foreground text-sm font-bold text-background">
-                  &gt;_
+                <div className="mx-auto mb-1 flex size-10 items-center justify-center rounded-xl bg-emerald-800 text-white">
+                  <HandHeart className="size-5" />
                 </div>
-                <CardTitle className="text-xl">{t("auth_title")}</CardTitle>
+                <CardTitle className="text-xl font-extrabold text-slate-900">{t("auth_title")}</CardTitle>
                 <CardDescription>{t("auth_desc")}</CardDescription>
               </CardHeader>
               <form onSubmit={handleEmailSubmit}>
@@ -144,7 +144,7 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
                     />
                   </div>
                   {error && (
-                    <p className="text-sm text-red-500">{error}</p>
+                    <p className="text-sm font-semibold text-rose-600">{error}</p>
                   )}
                 </CardContent>
                 <CardFooter className="flex-col gap-3">
@@ -223,7 +223,7 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
                     </InputOTP>
                   </div>
                   {error && (
-                    <p className="mt-2 text-sm text-red-500 text-center">
+                    <p className="mt-2 text-center text-sm font-semibold text-rose-600">
                       {error}
                     </p>
                   )}

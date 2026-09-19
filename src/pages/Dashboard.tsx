@@ -22,8 +22,7 @@ import {
   Radio,
   Radar,
   Briefcase,
-  Wallet,
-  Terminal,
+  HandHeart,
 } from "lucide-react";
 
 const STATUS_TONE: Record<string, "neutral" | "ok" | "warn" | "saffron"> = {
@@ -148,7 +147,7 @@ export default function Dashboard() {
   if (authLoading || artisan === undefined) {
     return (
       <main className="flex min-h-screen items-center justify-center">
-        <Loader2 className="size-6 animate-spin text-muted-foreground" />
+        <Loader2 className="size-6 animate-spin text-slate-400" />
       </main>
     );
   }
@@ -159,9 +158,6 @@ export default function Dashboard() {
   const society = artisan ? getSociety(artisan.societyId) : undefined;
   const mine = jobs?.mine ?? [];
   const radar = jobs?.radar ?? [];
-  const active = mine.filter((b) =>
-    ["accepted", "enroute", "inprogress"].includes(b.status),
-  );
   const earned = mine
     .filter((b) => b.status === "settled" || b.status === "completed")
     .reduce((sum, b) => sum + b.base, 0);
@@ -173,14 +169,16 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="tl-shell">
-      <header className="tl-band sticky top-0 z-40">
+    <div className="min-h-screen">
+      <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur">
         <div className="mx-auto flex h-14 w-full max-w-5xl items-center justify-between px-4 sm:px-6">
           <Link to="/" className="flex items-center gap-2">
-            <span className="flex size-7 items-center justify-center rounded-sm border border-foreground bg-foreground text-xs font-bold text-background">
-              &gt;_
+            <span className="flex size-7 items-center justify-center rounded-lg bg-emerald-800 text-white">
+              <HandHeart className="size-4" />
             </span>
-            <span className="text-sm font-bold">sahakar-seva</span>
+            <span className="text-sm font-bold text-slate-900">
+              Sahakar Seva
+            </span>
           </Link>
           <div className="flex items-center gap-2">
             <LanguagePicker />
@@ -196,7 +194,11 @@ export default function Dashboard() {
         <div className="flex flex-wrap items-end justify-between gap-4">
           <SectionHeader
             title={t("hub_title")}
-            sub={artisan ? t("hub_welcome", { name: artisan.fullName }) : t("hub_not_onboarded")}
+            sub={
+              artisan
+                ? t("hub_welcome", { name: artisan.fullName })
+                : t("hub_not_onboarded")
+            }
           />
           {artisan && (
             <div className="flex items-center gap-2">
@@ -205,7 +207,7 @@ export default function Dashboard() {
                 {online ? t("status_online") : t("status_offline")}
               </MonoBadge>
               <TlButton
-                variant={online ? "outline" : "ok"}
+                variant={online ? "outline" : "primary"}
                 disabled={toggling}
                 onClick={() => toggleOnline(!online)}
               >
@@ -223,16 +225,14 @@ export default function Dashboard() {
         {!artisan && (
           <Panel className="mt-8">
             <div className="flex flex-col items-center gap-4 py-10 text-center">
-              <span className="flex size-12 items-center justify-center rounded-full border border-border bg-secondary">
-                <Terminal className="size-5 text-muted-foreground" />
+              <span className="flex size-12 items-center justify-center rounded-2xl border border-emerald-200 bg-emerald-50">
+                <HandHeart className="size-5 text-emerald-700" />
               </span>
-              <p className="max-w-sm text-sm text-muted-foreground">
+              <p className="max-w-sm text-sm text-slate-600">
                 {t("hub_not_onboarded")}
               </p>
               <Link to="/onboarding">
-                <TlButton variant="saffron" className="tl-btn-saffron">
-                  {t("hub_cta_onboard")}
-                </TlButton>
+                <TlButton>{t("hub_cta_onboard")}</TlButton>
               </Link>
             </div>
           </Panel>
@@ -247,30 +247,40 @@ export default function Dashboard() {
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-center gap-3">
                     <span
-                      className={`flex size-11 items-center justify-center rounded-sm border ${
+                      className={`flex size-11 items-center justify-center rounded-xl border ${
                         online
-                          ? "border-ok/30 bg-ok-soft"
-                          : "border-border bg-secondary"
+                          ? "border-emerald-200 bg-emerald-50"
+                          : "border-slate-200 bg-slate-50"
                       }`}
                     >
                       {TradeIcon && (
-                        <TradeIcon className={`size-5 ${online ? "text-ok" : "text-muted-foreground"}`} />
+                        <TradeIcon
+                          className={`size-5 ${
+                            online ? "text-emerald-700" : "text-slate-400"
+                          }`}
+                        />
                       )}
                     </span>
                     <div>
-                      <p className="text-xs font-bold">
+                      <p className="text-xs font-bold text-slate-900">
                         {online ? t("telemetry_on") : t("telemetry_off")}
                       </p>
-                      <p className="mt-0.5 text-[10px] text-muted-foreground">
+                      <p className="mt-0.5 text-[11px] text-slate-400">
                         {online ? "20s ping" : "—"}
                       </p>
                     </div>
                   </div>
                   <StatusDot tone={online ? "ok" : "idle"} blink={online} />
                 </div>
-                <div className="mt-4 grid grid-cols-3 gap-px overflow-hidden rounded-sm border border-border bg-border text-center">
-                  <TeleCell label={t("tele_lat")} value={artisan.lat?.toFixed(4) ?? "—"} />
-                  <TeleCell label={t("tele_lng")} value={artisan.lng?.toFixed(4) ?? "—"} />
+                <div className="mt-4 grid grid-cols-3 gap-2">
+                  <TeleCell
+                    label={t("tele_lat")}
+                    value={artisan.lat?.toFixed(4) ?? "—"}
+                  />
+                  <TeleCell
+                    label={t("tele_lng")}
+                    value={artisan.lng?.toFixed(4) ?? "—"}
+                  />
                   <TeleCell
                     label={t("tele_ping")}
                     value={
@@ -280,24 +290,30 @@ export default function Dashboard() {
                     }
                   />
                 </div>
-                {geoError && <p className="mt-3 text-[10px] text-warn">{geoError}</p>}
+                {geoError && (
+                  <p className="mt-3 text-[11px] font-semibold text-amber-700">
+                    {geoError}
+                  </p>
+                )}
               </Panel>
 
               {/* Earnings */}
               <Panel title={t("earnings_title")} bodyClassName="p-4">
-                <div className="grid grid-cols-2 gap-px overflow-hidden rounded-sm border border-border bg-border">
-                  <div className="bg-card px-3 py-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
                     <p className="tl-label">{t("earn_collected")}</p>
-                    <p className="mt-1 text-lg font-bold text-forest">₹{earned.toLocaleString("en-IN")}</p>
+                    <p className="mt-1 text-lg font-black text-emerald-800">
+                      ₹{earned.toLocaleString("en-IN")}
+                    </p>
                   </div>
-                  <div className="bg-card px-3 py-3">
+                  <div className="rounded-xl border border-orange-200 bg-orange-50 px-3 py-3">
                     <p className="tl-label">{t("welfare")}</p>
-                    <p className="mt-1 text-lg font-bold text-forest">
+                    <p className="mt-1 text-lg font-black text-orange-800">
                       ₹{artisan.welfareBalance.toLocaleString("en-IN")}
                     </p>
                   </div>
                 </div>
-                <p className="mt-3 text-[10px] leading-4 text-muted-foreground">
+                <p className="mt-3 text-[11px] leading-4 text-slate-500">
                   {t("ledger_note")}
                 </p>
               </Panel>
@@ -306,10 +322,10 @@ export default function Dashboard() {
               <Panel title={t("card_id")}>
                 <div className="flex items-center justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="truncate text-xs font-bold">
+                    <p className="truncate text-xs font-bold text-slate-900">
                       {artisan.credentialId ?? t("quiz_none")}
                     </p>
-                    <p className="text-[10px] text-muted-foreground">
+                    <p className="text-[11px] text-slate-500">
                       {t("cred_score")}: {artisan.quizScore ?? 0}%
                     </p>
                   </div>
@@ -326,18 +342,25 @@ export default function Dashboard() {
                 tag={`${radar.length}`}
                 bodyClassName="p-0"
               >
-                <div className="tl-grid-bg divide-y divide-border">
+                <div className="divide-y divide-slate-100">
                   {radar.length === 0 && (
-                    <p className="px-5 py-10 text-center text-xs text-muted-foreground">
+                    <p className="px-5 py-10 text-center text-xs text-slate-500">
                       {t("radar_empty")}
                     </p>
                   )}
                   {radar.map((b) => (
-                    <div key={b._id} className="flex items-center gap-3 px-4 py-3">
-                      <Radar className="size-4 shrink-0 text-saffron" />
+                    <div
+                      key={b._id}
+                      className="flex items-center gap-3 px-4 py-3"
+                    >
+                      <span className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50">
+                        <Radar className="size-4 text-emerald-700" />
+                      </span>
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-xs font-bold">{b.serviceName}</p>
-                        <p className="truncate text-[10px] text-muted-foreground">
+                        <p className="truncate text-xs font-bold text-slate-900">
+                          {b.serviceName}
+                        </p>
+                        <p className="truncate text-[11px] text-slate-500">
                           {b.address.slice(0, 44)} · ₹{b.total}
                         </p>
                       </div>
@@ -359,21 +382,28 @@ export default function Dashboard() {
 
               {/* Active + history jobs */}
               <Panel title={t("myjobs_title")} bodyClassName="p-0">
-                <div className="divide-y divide-border">
+                <div className="divide-y divide-slate-100">
                   {mine.length === 0 && (
-                    <p className="px-5 py-10 text-center text-xs text-muted-foreground">
+                    <p className="px-5 py-10 text-center text-xs text-slate-500">
                       {t("myjobs_empty")}
                     </p>
                   )}
                   {mine.map((b) => (
-                    <div key={b._id} className="flex items-center gap-3 px-4 py-3">
-                      <Briefcase className="size-4 shrink-0 text-muted-foreground" />
+                    <div
+                      key={b._id}
+                      className="flex items-center gap-3 px-4 py-3"
+                    >
+                      <Briefcase className="size-4 shrink-0 text-slate-400" />
                       <div className="min-w-0 flex-1">
-                        <Link to={`/bookings/${b._id}`} className="block truncate text-xs font-bold hover:underline">
+                        <Link
+                          to={`/bookings/${b._id}`}
+                          className="block truncate text-xs font-bold text-slate-900 hover:text-emerald-700"
+                        >
                           {b.serviceName}
                         </Link>
-                        <p className="truncate text-[10px] text-muted-foreground">
-                          {new Date(b.scheduledFor).toLocaleDateString("en-IN")} · ₹{b.total}
+                        <p className="truncate text-[11px] text-slate-500">
+                          {new Date(b.scheduledFor).toLocaleDateString("en-IN")}{" "}
+                          · ₹{b.total}
                         </p>
                       </div>
                       <MonoBadge tone={STATUS_TONE[b.status] ?? "neutral"}>
@@ -407,9 +437,13 @@ export default function Dashboard() {
 
 function TeleCell({ label, value }: { label: string; value: string }) {
   return (
-    <div className="bg-card px-3 py-2.5">
-      <p className="text-[9px] uppercase tracking-widest text-muted-foreground">{label}</p>
-      <p className="mt-0.5 truncate text-xs font-bold">{value}</p>
+    <div className="rounded-xl border border-teal-200 bg-teal-50 px-2 py-2.5 text-center">
+      <p className="text-[9px] font-semibold uppercase tracking-wider text-teal-700">
+        {label}
+      </p>
+      <p className="mt-0.5 truncate text-xs font-bold text-teal-900">
+        {value}
+      </p>
     </div>
   );
 }
