@@ -8,7 +8,6 @@ import { Panel, SectionHeader, TlButton, StatusDot } from "@/components/terminal
 import {
   ArrowLeft,
   ArrowRight,
-  BadgeCheck,
   Clock,
   Zap,
   ShieldCheck,

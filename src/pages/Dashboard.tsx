@@ -5,7 +5,7 @@ import type { Id } from "@/convex/_generated/dataModel";
 import { Link } from "react-router";
 import { useAuth } from "@/hooks/use-auth";
 import { useLang } from "@/lib/i18n";
-import { getTrade, getSociety } from "@/lib/trades";
+import { getTrade } from "@/lib/trades";
 import { stopSpeaking } from "@/lib/speech";
 import {
   LanguagePicker,
@@ -38,7 +38,7 @@ const STATUS_TONE: Record<string, "neutral" | "ok" | "warn" | "saffron"> = {
 
 export default function Dashboard() {
   const { t } = useLang();
-  const { user, isLoading: authLoading, signOut } = useAuth();
+  const { isLoading: authLoading, signOut } = useAuth();
   const artisan = useQuery(api.artisans.getMyArtisan, {});
   const jobs = useQuery(api.bookings.listForWorker, {});
   const setPresence = useMutation(api.artisans.setPresence);
@@ -155,7 +155,6 @@ export default function Dashboard() {
   const online = artisan?.isOnline ?? false;
   const trade = artisan ? getTrade(artisan.trade) : undefined;
   const TradeIcon = trade?.icon;
-  const society = artisan ? getSociety(artisan.societyId) : undefined;
   const mine = jobs?.mine ?? [];
   const radar = jobs?.radar ?? [];
   const earned = mine

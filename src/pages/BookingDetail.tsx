@@ -4,6 +4,7 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useAuth } from "@/hooks/use-auth";
 import { useLang } from "@/lib/i18n";
+import type { Id } from "@/convex/_generated/dataModel";
 import { getService, COLOR_SOFT } from "@/lib/trades";
 import { AppHeader } from "@/components/AppHeader";
 import { MonoBadge, Panel, StatusDot, TlButton } from "@/components/terminal";
@@ -42,8 +43,10 @@ export default function BookingDetail() {
   const { id } = useParams();
   const { t } = useLang();
   const { user } = useAuth();
-  const booking = useQuery(api.bookings.getBooking, { id: id as any });
-  const messages = useQuery(api.bookings.listMessages, { bookingId: id as any });
+  const booking = useQuery(api.bookings.getBooking, { id: id as Id<"bookings"> });
+  const messages = useQuery(api.bookings.listMessages, {
+    bookingId: id as Id<"bookings">,
+  });
   const sendMessage = useMutation(api.bookings.sendMessage);
   const advance = useMutation(api.bookings.advance);
   const confirmUtr = useMutation(api.bookings.confirmUtr);

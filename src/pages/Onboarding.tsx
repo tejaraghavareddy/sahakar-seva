@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Doc } from "@/convex/_generated/dataModel";
@@ -9,7 +9,6 @@ import {
   TRADES,
   QUIZ,
   QUIZ_PASS_MARK,
-  getTrade,
   type TradeId,
 } from "@/lib/trades";
 import {
@@ -77,7 +76,6 @@ export default function Onboarding() {
   const { t, speechLang } = useLang();
   const artisan = useQuery(api.artisans.getMyArtisan, {});
   const saveProfile = useMutation(api.artisans.saveProfile);
-  const submitQuiz = useMutation(api.artisans.submitQuiz);
   const navigate = useNavigate();
 
   const [step, setStep] = useState<Step>(1);
@@ -88,6 +86,7 @@ export default function Onboarding() {
   /* Hydrate form from stored profile and gate the step. */
   useEffect(() => {
     if (!artisan) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- sync once from the server-loaded profile
     setForm((f) => ({
       ...f,
       fullName: f.fullName || artisan.fullName,
@@ -521,7 +520,11 @@ function StepKyc({
           <Row label={t("kyc_ref")} value={artisan.kycRef ?? "—"} />
           <Row
             label={t("kyc_time")}
-            value={new Date(artisan.kycVerifiedAt ?? Date.now()).toLocaleString()}
+            value={
+              artisan.kycVerifiedAt
+                ? new Date(artisan.kycVerifiedAt).toLocaleString()
+                : "—"
+            }
           />
           <div className="flex items-center justify-between pt-1">
             <span className="text-muted-foreground">{t("kyc_row")}</span>
@@ -564,7 +567,7 @@ function StepQuiz({
   const [micError, setMicError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [quizError, setQuizError] = useState<string | null>(null);
-  const [spokenIdx, setSpokenIdx] = useState<number | null>(null);
+  const spokenIdxRef = useRef<number | null>(null);
 
   const q = questions[idx];
   const total = questions.length;
@@ -574,7 +577,7 @@ function StepQuiz({
   useEffect(() => {
     if (!q) return;
     speak(spokenQuestion(idx, q.options), speechLang);
-    setSpokenIdx(idx);
+    spokenIdxRef.current = idx;
     return () => stopSpeaking();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [idx, artisan.trade]);
@@ -665,12 +668,12 @@ function StepQuiz({
             <button
               type="button"
               onClick={() => {
-                if (spokenIdx === idx) {
+                if (spokenIdxRef.current === idx) {
                   stopSpeaking();
-                  setSpokenIdx(null);
+                  spokenIdxRef.current = null;
                 } else {
                   speak(spokenQuestion(idx, q.options), speechLang);
-                  setSpokenIdx(idx);
+                  spokenIdxRef.current = idx;
                 }
               }}
               className="tl-icon-btn"
@@ -821,9 +824,11 @@ function StepCredential({
           <Row label={t("cred_score")} value={`${artisan.quizScore ?? 0}%`} />
           <Row
             label={t("cred_issued")}
-            value={new Date(
-              artisan.credentialIssuedAt ?? Date.now(),
-            ).toLocaleDateString()}
+            value={
+              artisan.credentialIssuedAt
+                ? new Date(artisan.credentialIssuedAt).toLocaleDateString()
+                : "—"
+            }
           />
           <Row label={t("kyc_masked")} value={`XXXX XXXX ${artisan.idLast4}`} />
         </div>

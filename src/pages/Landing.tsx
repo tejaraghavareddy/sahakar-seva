@@ -8,7 +8,6 @@ import { useLang } from "@/lib/i18n";
 import { TRADES } from "@/lib/trades";
 import {
   LanguagePicker,
-  MonoBadge,
   Panel,
   SectionHeader,
   TlButton,

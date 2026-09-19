@@ -31,7 +31,6 @@ import {
   WashingMachine,
   Refrigerator,
   Microwave,
-  Lamp,
   Timer,
   Container,
   DoorOpen,

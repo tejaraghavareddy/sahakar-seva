@@ -40,11 +40,7 @@ export function AppHeader() {
         <div className="flex items-center gap-2">
           <LanguagePicker />
           {user && (
-            <TlButton
-              variant="ghost"
-              onClick={() => void signOut()}
-              title={t("nav_signout")}
-            >
+            <TlButton variant="ghost" onClick={() => void signOut()}>
               <LogOut className="size-4" />
             </TlButton>
           )}
