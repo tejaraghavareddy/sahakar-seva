@@ -296,10 +296,13 @@ const en: Dict = {
   ad_cancel: "cancel",
 };
 
-/* Bengali gateway keys live in ./i18n.bn-gw and are merged into the `en`
-   fallback dictionary. Every other language defines its own `gw_*` keys,
-   so these values are only reached when the active language is `bn`. */
-Object.assign(en, GW_BN);
+/* Bengali gateway keys live in ./i18n.bn-gw. They are merged into the `bn`
+   dictionary via initBnGateway() (called once from main.tsx before the first
+   render) because this file's tail region resists edits in this environment.
+   `en` must stay pure English — t() reads en[key] for the English UI too. */
+export function initBnGateway() {
+  Object.assign(bn, GW_BN);
+}
 
 const hi: Dict = {
   gw_op_badge: "संघ सक्रिय — डिस्पैच जारी",

@@ -7,7 +7,7 @@ import { ConvexReactClient } from "convex/react";
 import React, { StrictMode, useEffect, lazy, Suspense } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Route, Routes, useLocation } from "react-router";
-import { LanguageProvider } from "@/lib/i18n";
+import { LanguageProvider, initBnGateway } from "@/lib/i18n";
 import "./index.css";
 
 // Lazy load route components for better code splitting
@@ -89,6 +89,10 @@ class RootErrorBoundary extends React.Component<
 }
 
 const convex = new ConvexReactClient(import.meta.env.VITE_CONVEX_URL as string);
+
+// Merge Bengali gateway strings into the `bn` dictionary before first render
+// (hoisted function from i18n.tsx; `bn` is initialized by the time this runs).
+initBnGateway();
 
 
 
