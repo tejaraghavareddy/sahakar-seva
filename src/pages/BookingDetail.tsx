@@ -14,9 +14,11 @@ import {
   Loader2,
   Send,
   ShieldCheck,
+  Signal,
   XCircle,
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
+import CustomerRealtimeRadarMap from "@/components/map/CustomerRealtimeRadarMap";
 
 const FLOW = [
   "pending",
@@ -56,6 +58,12 @@ export default function BookingDetail() {
   const [chat, setChat] = useState("");
   const [busy, setBusy] = useState(false);
   const [paid, setPaid] = useState(false);
+  const radar = useQuery(
+    api.gis.radar,
+    ["accepted", "enroute", "inprogress"].includes(booking?.status ?? "") && booking
+      ? { bookingId: booking._id }
+      : "skip",
+  );
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -220,6 +228,29 @@ export default function BookingDetail() {
               ))}
             </div>
           </Panel>
+        )}
+
+        {/* Live radar map */}
+        {radar && radar.worker && radar.worker.lat && radar.worker.lng &&
+         booking.lat && booking.lng && (
+          <div className="mt-5">
+            <p className="mb-2 flex items-center gap-1.5 text-xs font-bold text-slate-900">
+              <Signal className="size-3.5 text-emerald-600" />
+              Live artisan radar
+            </p>
+            <CustomerRealtimeRadarMap
+              customerLat={booking.lat}
+              customerLng={booking.lng}
+              worker={{
+                lat: radar.worker.lat,
+                lng: radar.worker.lng,
+                name: radar.worker.fullName,
+                trade: radar.worker.trade,
+                telemetryAt: radar.worker.telemetryAt,
+              }}
+              trade={booking.serviceId.split("-")[0]}
+            />
+          </div>
         )}
 
         <div className="mt-5 grid gap-5 lg:grid-cols-2">

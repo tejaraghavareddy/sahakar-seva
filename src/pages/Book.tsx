@@ -13,7 +13,9 @@ import {
   MapPin,
   HeartHandshake,
   Zap,
+  MapPinned,
 } from "lucide-react";
+import LocationPickerModal from "@/components/map/LocationPickerModal";
 
 const SLOTS = [
   "09:00",
@@ -54,6 +56,9 @@ export default function Book() {
   const [welfare, setWelfare] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [lat, setLat] = useState<number | undefined>();
+  const [lng, setLng] = useState<number | undefined>();
+  const [showMap, setShowMap] = useState(false);
 
   if (!svc) {
     return (
@@ -89,6 +94,8 @@ export default function Book() {
       const bookingId = await createBooking({
         serviceId: svc.id,
         address: address,
+        lat,
+        lng,
         scheduledFor: scheduled.getTime(),
         urgent: asap && svc.urgent,
         notes: notes || undefined,
@@ -154,7 +161,33 @@ export default function Book() {
                 onChange={(e) => setAddress(e.target.value)}
               />
             </div>
+            <button
+              type="button"
+              onClick={() => setShowMap(true)}
+              className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-emerald-300 bg-emerald-50/50 px-4 py-2.5 text-xs font-bold text-emerald-700 transition hover:bg-emerald-50"
+            >
+              <MapPinned className="size-4" />
+              Pick exact location on map
+            </button>
+            {lat !== undefined && lng !== undefined && (
+              <p className="mt-1.5 text-[11px] text-slate-400">
+                📍 {lat.toFixed(5)}, {lng.toFixed(5)}
+              </p>
+            )}
           </Panel>
+
+          <LocationPickerModal
+            open={showMap}
+            initialLat={lat}
+            initialLng={lng}
+            onClose={() => setShowMap(false)}
+            onConfirm={(loc) => {
+              setAddress(loc.address);
+              setLat(loc.lat);
+              setLng(loc.lng);
+              setShowMap(false);
+            }}
+          />
 
           {/* Schedule */}
           <Panel title={t("bk_date")}>

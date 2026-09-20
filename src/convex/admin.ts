@@ -75,6 +75,54 @@ export const workerDirectory = query({
   },
 });
 
+export const amAdmin = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (userId === null) return false;
+    return isAdminUser(ctx, userId);
+  },
+});
+
+/** Artisans pending KYC verification (formal registration pipeline). */
+export const verificationQueue = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await requireUser(ctx);
+    if (!(await isAdminUser(ctx, userId))) throw new Error("Forbidden");
+    return await ctx.db
+      .query("artisans")
+      .withIndex("by_kyc", (q) => q.eq("kycStatus", "pending"))
+      .take(200);
+  },
+});
+
+/** Approve or reject an artisan's KYC identity verification. */
+export const reviewKyc = mutation({
+  args: {
+    artisanId: v.id("artisans"),
+    approve: v.boolean(),
+    note: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const userId = await requireUser(ctx);
+    if (!(await isAdminUser(ctx, userId))) throw new Error("Forbidden");
+    const artisan = await ctx.db.get(args.artisanId);
+    if (!artisan) throw new Error("Artisan not found");
+    if (artisan.kycStatus !== "pending") {
+      throw new Error("This artisan's KYC is not pending review");
+    }
+    const now = Date.now();
+    const kycRef = `BGC-${now.toString(36).toUpperCase().slice(-8)}`;
+    await ctx.db.patch(args.artisanId, {
+      kycStatus: args.approve ? "verified" : "rejected",
+      ...(args.approve
+        ? { kycVerifiedAt: now, kycRef }
+        : { reviewNote: args.note?.trim() || "Rejected by federation officer" }),
+    });
+  },
+});
+
 /** Admin cancels any active booking (federation override). */
 export const adminCancelBooking = mutation({
   args: { id: v.id("bookings") },

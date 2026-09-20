@@ -90,9 +90,6 @@ export const saveProfile = mutation({
     const existing = await getMyArtisanInternal(ctx, userId);
     const now = Date.now();
 
-    // Simulated background verification — v1 auto-verifies with a reference.
-    const kycRef = `BGC-${now.toString(36).toUpperCase().slice(-8)}`;
-
     const fields = {
       fullName: args.fullName.trim(),
       phone: args.phone.trim(),
@@ -105,9 +102,7 @@ export const saveProfile = mutation({
       upiVpa: args.upiVpa?.trim() || undefined,
       idType: args.idType,
       idLast4: args.idNumber.replace(/\D/g, "").slice(-4),
-      kycStatus: "verified" as const,
-      kycVerifiedAt: now,
-      kycRef,
+      kycStatus: "pending" as const,
     };
 
     if (existing) {
