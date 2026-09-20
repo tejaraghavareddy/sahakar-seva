@@ -1,36 +1,13 @@
 import '@vly-ai/integrations';
 import { Toaster } from "@/components/ui/sonner";
-import { RequireAuth } from "@/components/RequireAuth";
 import { VlyToolbar } from "../vly-toolbar-readonly.tsx";
 import { ConvexAuthProvider } from "@convex-dev/auth/react";
 import { ConvexReactClient } from "convex/react";
-import React, { StrictMode, useEffect, lazy, Suspense } from "react";
+import React, { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { BrowserRouter, Route, Routes, useLocation } from "react-router";
 import { LanguageProvider, initBnGateway } from "@/lib/i18n";
+import App from "./App";
 import "./index.css";
-
-// Lazy load route components for better code splitting
-const Landing = lazy(() => import("./pages/Landing.tsx"));
-const AuthPage = lazy(() => import("./pages/Auth.tsx"));
-const Dashboard = lazy(() => import("./pages/Dashboard.tsx"));
-const Onboarding = lazy(() => import("./pages/Onboarding.tsx"));
-const Services = lazy(() => import("./pages/Services.tsx"));
-const ServiceDetail = lazy(() => import("./pages/ServiceDetail.tsx"));
-const Book = lazy(() => import("./pages/Book.tsx"));
-const Bookings = lazy(() => import("./pages/Bookings.tsx"));
-const BookingDetail = lazy(() => import("./pages/BookingDetail.tsx"));
-const Admin = lazy(() => import("./pages/Admin.tsx"));
-const NotFound = lazy(() => import("./pages/NotFound.tsx"));
-
-// Simple loading fallback for route transitions
-function RouteLoading() {
-  return (
-    <div className="min-h-screen flex items-center justify-center">
-      <div className="animate-pulse text-muted-foreground">Loading...</div>
-    </div>
-  );
-}
 
 /** Silent error boundary — if VlyToolbar crashes it renders nothing instead of
  *  crashing the whole app (e.g. hook errors in WebContainer environment). */
@@ -94,32 +71,6 @@ const convex = new ConvexReactClient(import.meta.env.VITE_CONVEX_URL as string);
 // (hoisted function from i18n.tsx; `bn` is initialized by the time this runs).
 initBnGateway();
 
-
-
-function RouteSyncer() {
-  const location = useLocation();
-  useEffect(() => {
-    window.parent.postMessage(
-      { type: "iframe-route-change", path: location.pathname },
-      "*",
-    );
-  }, [location.pathname]);
-
-  useEffect(() => {
-    function handleMessage(event: MessageEvent) {
-      if (event.data?.type === "navigate") {
-        if (event.data.direction === "back") window.history.back();
-        if (event.data.direction === "forward") window.history.forward();
-      }
-    }
-    window.addEventListener("message", handleMessage);
-    return () => window.removeEventListener("message", handleMessage);
-  }, []);
-
-  return null;
-}
-
-
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <RootErrorBoundary>
@@ -128,75 +79,7 @@ createRoot(document.getElementById("root")!).render(
       </ToolbarErrorBoundary>
       <ConvexAuthProvider client={convex}>
         <LanguageProvider>
-          <BrowserRouter>
-            <RouteSyncer />
-            <Suspense fallback={<RouteLoading />}>
-              <Routes>
-                <Route path="/" element={<Landing />} />
-                <Route
-                  path="/auth"
-                  element={<AuthPage redirectAfterAuth="/dashboard" />}
-                />
-                <Route
-                  path="/dashboard"
-                  element={
-                    <RequireAuth>
-                      <Dashboard />
-                    </RequireAuth>
-                  }
-                />
-                <Route
-                  path="/services"
-                  element={<Services />}
-                />
-                <Route
-                  path="/services/:id"
-                  element={<ServiceDetail />}
-                />
-                <Route
-                  path="/book/:id"
-                  element={
-                    <RequireAuth>
-                      <Book />
-                    </RequireAuth>
-                  }
-                />
-                <Route
-                  path="/bookings"
-                  element={
-                    <RequireAuth>
-                      <Bookings />
-                    </RequireAuth>
-                  }
-                />
-                <Route
-                  path="/bookings/:id"
-                  element={
-                    <RequireAuth>
-                      <BookingDetail />
-                    </RequireAuth>
-                  }
-                />
-                <Route
-                  path="/admin"
-                  element={
-                    <RequireAuth>
-                      <Admin />
-                    </RequireAuth>
-                  }
-                />
-                <Route
-                  path="/onboarding"
-                  element={
-                    <RequireAuth>
-                      <Onboarding />
-                    </RequireAuth>
-                  }
-                />
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </Suspense>
-          </BrowserRouter>
+          <App />
           <Toaster />
         </LanguageProvider>
       </ConvexAuthProvider>
