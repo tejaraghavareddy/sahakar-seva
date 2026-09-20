@@ -112,6 +112,46 @@ const schema = defineSchema(
       .index("by_status", ["status"])
       .index("by_created", ["createdAt"]),
 
+    // District cooperative societies — formal registration pipeline
+    societies: defineTable({
+      name: v.string(),
+      district: v.string(),
+      state: v.string(),
+      code: v.string(), // e.g. TS-HYD-13 (state-district-seq)
+      registrationNo: v.string(), // SSC/REG/YYYY/NNN charter reference
+      jurisdiction: v.optional(v.string()), // mandals / neighborhoods covered
+      lat: v.optional(v.number()), // HQ coordinates
+      lng: v.optional(v.number()),
+      address: v.optional(v.string()),
+      contactPhone: v.optional(v.string()),
+      status: v.string(), // pending | active | suspended | rejected
+      reviewNote: v.optional(v.string()),
+      registeredBy: v.id("users"),
+      reviewedAt: v.optional(v.number()),
+      createdAt: v.number(),
+    })
+      .index("by_status", ["status"])
+      .index("by_state", ["state"]),
+
+    // Gemini-driven demand forecasts & fair-pricing stabilization snapshots
+    forecasts: defineTable({
+      kind: v.string(), // "forecast" | "stabilization"
+      district: v.string(),
+      demandIndex: v.number(), // 1..100
+      primaryDeficitTrades: v.array(v.string()),
+      priceRecommendation: v.string(),
+      welfarePoolAllocation: v.number(), // suggested % of welfare reserve
+      advisories: v.array(v.string()), // tactical advisories for branch managers
+      summary: v.optional(v.string()),
+      source: v.string(), // "gemini" | "heuristic"
+      model: v.optional(v.string()),
+      context: v.optional(v.string()), // telemetry snapshot fed to the model
+      createdBy: v.id("users"),
+      createdAt: v.number(),
+    })
+      .index("by_created", ["createdAt"])
+      .index("by_district", ["district"]),
+
     // In-booking chat between customer and worker
     messages: defineTable({
       bookingId: v.id("bookings"),
