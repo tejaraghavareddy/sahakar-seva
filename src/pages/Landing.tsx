@@ -4,6 +4,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { LanguagePicker } from "@/components/terminal";
 import { useDetectedLocation, formatCoords, formatAccuracy } from "@/lib/useLocation";
 import LocationPickerModal from "@/components/map/LocationPickerModal";
+import AdminLoginModal from "@/components/AdminLoginModal";
 import { motion } from "framer-motion";
 import {
   ArrowRight,
@@ -11,6 +12,7 @@ import {
   HardHat,
   MapPin,
   RefreshCcw,
+  ShieldCheck,
 } from "lucide-react";
 
 /* ── Brand mark: rounded emerald tile with the सह glyph ─────── */
@@ -37,6 +39,7 @@ export default function Landing() {
   const navigate = useNavigate();
   const { location, detect, setManual } = useDetectedLocation();
   const [showMap, setShowMap] = useState(false);
+  const [showAdminLogin, setShowAdminLogin] = useState(false);
 
   return (
     <div className="flex min-h-screen flex-col bg-gradient-to-b from-slate-50 via-emerald-50/30 to-slate-100 font-sans text-slate-900 antialiased">
@@ -109,14 +112,14 @@ export default function Landing() {
 
           {/* ── Role selection heading ───────────────────────── */}
           <h2 className="mt-10 text-xl font-black tracking-tight text-slate-900 sm:text-2xl">
-            Choose whether you are a Worker or Booking Person:
+            Choose your gateway
           </h2>
           <p className="mt-1.5 text-xs text-slate-500 italic sm:text-sm">
-            Select your role to access the dedicated interface
+            Booker, Artisan, or Federation Admin — three portals, one cooperative
           </p>
 
           {/* ── Two gateway cards ────────────────────────────── */}
-          <div className="mt-8 grid w-full max-w-4xl grid-cols-1 gap-6 text-left md:grid-cols-2">
+          <div className="mt-8 grid w-full max-w-5xl grid-cols-1 gap-6 text-left md:grid-cols-3">
             <GatewayCard to="/services" delay={0.05}>
               <div className="flex items-start justify-between">
                 <span className="flex size-14 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700 transition group-hover:scale-105">
@@ -160,15 +163,38 @@ export default function Landing() {
                 Worker Portal (Sign In &amp; Verify) →
               </span>
             </GatewayCard>
+
+            <GatewayCard to="/admin" delay={0.19}>
+              <div className="flex items-start justify-between">
+                <span className="flex size-14 items-center justify-center rounded-2xl bg-slate-100 text-slate-800 transition group-hover:scale-105">
+                  <ShieldCheck className="size-7" />
+                </span>
+                <ArrowRight className="size-5 text-slate-300 transition group-hover:translate-x-1 group-hover:text-slate-600" />
+              </div>
+              <span className="mt-5 w-fit rounded-full border border-slate-300 bg-slate-100 px-3 py-1 text-[11px] font-semibold text-slate-700">
+                Federation Admin
+              </span>
+              <h3 className="mt-2.5 text-2xl font-black tracking-tight text-slate-900">
+                Governance Board
+              </h3>
+              <p className="mt-2 text-sm leading-relaxed text-slate-500 italic">
+                Officer clearance required. Oversee verification, GIS dispatch,
+                welfare funds, and district societies.
+              </p>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  setShowAdminLogin(true);
+                }}
+                className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-3.5 text-sm font-bold text-white shadow-md transition hover:bg-slate-800 group-active:scale-[0.98]"
+              >
+                Secure Officer Sign-In →
+              </button>
+            </GatewayCard>
           </div>
 
-          {/* ── Admin text link ──────────────────────────────── */}
-          <Link
-            to="/admin"
-            className="mt-10 text-xs font-semibold text-slate-500 underline decoration-slate-300 underline-offset-4 transition hover:text-emerald-700 hover:decoration-emerald-400"
-          >
-            Federation Administration &amp; Verification Board →
-          </Link>
+          {/* ── Admin text link removed — replaced by gateway card ── */}
 
           {!isLoading && isAuthenticated && (
             <button
@@ -212,6 +238,16 @@ export default function Landing() {
             lng: loc.lng,
           });
           setShowMap(false);
+        }}
+      />
+
+      {/* Secure officer clearance for the admin gateway */}
+      <AdminLoginModal
+        open={showAdminLogin}
+        onClose={() => setShowAdminLogin(false)}
+        onSuccess={() => {
+          setShowAdminLogin(false);
+          navigate("/admin");
         }}
       />
     </div>

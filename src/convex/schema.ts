@@ -163,6 +163,22 @@ const schema = defineSchema(
       body: v.string(),
       at: v.number(),
     }).index("by_booking", ["bookingId"]),
+
+    // Dispute arbitration — double-blind flags from customers and workers
+    disputes: defineTable({
+      bookingId: v.id("bookings"),
+      raisedBy: v.id("users"),
+      raisedByRole: v.string(), // "customer" | "worker"
+      category: v.string(), // "late" | "quality" | "unsafe" | "payment" | "behavior" | "other"
+      details: v.string(),
+      status: v.string(), // open | resolved | dismissed | blacklisted
+      resolution: v.optional(v.string()),
+      resolvedBy: v.optional(v.id("users")),
+      resolvedAt: v.optional(v.number()),
+      createdAt: v.number(),
+    })
+      .index("by_status", ["status"])
+      .index("by_booking", ["bookingId"]),
   },
   {
     schemaValidation: false,

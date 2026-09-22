@@ -53,11 +53,16 @@ export default function BookingDetail() {
   const advance = useMutation(api.bookings.advance);
   const confirmUtr = useMutation(api.bookings.confirmUtr);
   const cancelBooking = useMutation(api.bookings.cancel);
+  const raiseDispute = useMutation(api.disputes.raise);
 
   const [utr, setUtr] = useState("");
   const [chat, setChat] = useState("");
   const [busy, setBusy] = useState(false);
   const [paid, setPaid] = useState(false);
+  const [showFlag, setShowFlag] = useState(false);
+  const [flagCategory, setFlagCategory] = useState("quality");
+  const [flagDetails, setFlagDetails] = useState("");
+  const [flagBusy, setFlagBusy] = useState(false);
   const radar = useQuery(
     api.gis.radar,
     ["accepted", "enroute", "inprogress"].includes(booking?.status ?? "") && booking
@@ -153,6 +158,24 @@ export default function BookingDetail() {
       });
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function handleFlag() {
+    if (!booking) return;
+    setFlagBusy(true);
+    try {
+      await raiseDispute({
+        bookingId: booking._id,
+        category: flagCategory,
+        details: flagDetails,
+      });
+      setShowFlag(false);
+      setFlagDetails("");
+    } catch {
+      // surfaced via Convex error
+    } finally {
+      setFlagBusy(false);
     }
   }
 
@@ -460,6 +483,58 @@ export default function BookingDetail() {
                 <XCircle className="size-4" />
                 {t("bd_cancel")}
               </button>
+            )}
+
+            {/* Raise dispute (double-blind flag) */}
+            {!showFlag ? (
+              <button
+                type="button"
+                onClick={() => setShowFlag(true)}
+                className="w-full rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs font-bold text-amber-800 transition hover:bg-amber-100 active:scale-95"
+              >
+                ⚑ Raise a dispute with the federation board
+              </button>
+            ) : (
+              <Panel title="Raise a dispute" bodyClassName="p-4">
+                <div className="space-y-3">
+                  <select
+                    value={flagCategory}
+                    onChange={(e) => setFlagCategory(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 focus:border-emerald-500 focus:bg-white focus:outline-none"
+                  >
+                    <option value="late">Late arrival</option>
+                    <option value="quality">Poor craftsmanship</option>
+                    <option value="unsafe">Unsafe work environment</option>
+                    <option value="payment">Payment dispute</option>
+                    <option value="behavior">Misconduct</option>
+                    <option value="other">Other</option>
+                  </select>
+                  <textarea
+                    rows={3}
+                    value={flagDetails}
+                    onChange={(e) => setFlagDetails(e.target.value)}
+                    placeholder="Describe the issue — the board will arbitrate both sides fairly…"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 transition focus:border-emerald-500 focus:bg-white focus:outline-none"
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowFlag(false)}
+                      className="flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-600 transition hover:bg-slate-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleFlag()}
+                      disabled={flagBusy || !flagDetails.trim()}
+                      className="flex-1 rounded-xl bg-amber-600 px-3 py-2 text-xs font-bold text-white transition hover:bg-amber-700 disabled:opacity-50"
+                    >
+                      {flagBusy ? "Submitting…" : "Submit to board"}
+                    </button>
+                  </div>
+                </div>
+              </Panel>
             )}
           </div>
         </div>

@@ -24,7 +24,7 @@ import {
   Plus,
 } from "lucide-react";
 
-type TabId = "overview" | "gis" | "forecast" | "governance" | "societies";
+type TabId = "overview" | "gis" | "forecast" | "governance" | "societies" | "welfare" | "disputes";
 
 const TABS: Array<{ id: TabId; label: string; icon: typeof Users }> = [
   { id: "overview", label: "Overview", icon: Users },
@@ -32,6 +32,8 @@ const TABS: Array<{ id: TabId; label: string; icon: typeof Users }> = [
   { id: "forecast", label: "AI Forecast", icon: BrainCircuit },
   { id: "governance", label: "KYC Queue", icon: ShieldCheck },
   { id: "societies", label: "District Societies", icon: Building2 },
+  { id: "welfare", label: "Welfare & Dividend", icon: HeartPulse },
+  { id: "disputes", label: "Disputes", icon: ShieldAlert },
 ];
 
 export default function Admin() {
@@ -103,6 +105,8 @@ export default function Admin() {
           {tab === "forecast" && <ForecastPanel />}
           {tab === "governance" && <GovernancePanel />}
           {tab === "societies" && <SocietiesPanel />}
+          {tab === "welfare" && <WelfarePanel />}
+          {tab === "disputes" && <DisputesPanel />}
         </div>
       </main>
     </div>
@@ -637,6 +641,241 @@ function SocietiesPanel() {
                     <XCircle className="size-3" />
                   </button>
                 </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </Panel>
+    </div>
+  );
+}
+
+/* ── Welfare & Dividend Settlement Ledger tab ── */
+
+function WelfarePanel() {
+  const overview = useQuery(api.admin.overview, {});
+  const ledger = useQuery(api.admin.earningsLedger, {});
+  const [dividendRate, setDividendRate] = useState(10);
+
+  if (overview === undefined || ledger === undefined) {
+    return <LoadingPlaceholder text="Loading cooperative ledger…" />;
+  }
+
+  const totalEarnings = ledger.reduce((s, e) => s + e.earnings, 0);
+  const surplus = overview.welfarePool;
+  const dividendPool = Math.round((surplus * dividendRate) / 100);
+
+  return (
+    <div className="space-y-5">
+      <div className="grid gap-4 lg:grid-cols-3">
+        <StatTile
+          icon={<Wallet className="size-3.5" />}
+          label="Gross volume · 0% platform fee"
+          value={`₹${overview.revenueSettled.toLocaleString("en-IN")}`}
+        />
+        <StatTile
+          icon={<HeartPulse className="size-3.5" />}
+          label="Cooperative welfare reserve (7%)"
+          value={`₹${overview.welfarePool.toLocaleString("en-IN")}`}
+          tone="orange"
+        />
+        <StatTile
+          icon={<Users className="size-3.5" />}
+          label="Operations reserve (3%)"
+          value={`₹${(overview.opsPool ?? 0).toLocaleString("en-IN")}`}
+        />
+      </div>
+
+      <Panel
+        title="Annual patronage dividend calculator"
+        className=""
+        bodyClassName="p-4"
+      >
+        <div className="flex flex-wrap items-center gap-4">
+          <div>
+            <label className="mb-0.5 block text-[10px] font-bold uppercase tracking-wider text-slate-400">
+              Surplus share returned to members (%)
+            </label>
+            <input
+              type="range"
+              min={0}
+              max={50}
+              value={dividendRate}
+              onChange={(e) => setDividendRate(Number(e.target.value))}
+              className="w-48 accent-emerald-600"
+            />
+            <p className="text-xs font-bold text-slate-900">{dividendRate}%</p>
+          </div>
+          <div className="rounded-xl border border-orange-200 bg-orange-50 px-4 py-3 text-center">
+            <p className="text-xl font-black text-orange-800">
+              ₹{dividendPool.toLocaleString("en-IN")}
+            </p>
+            <p className="text-[10px] font-bold uppercase tracking-wide text-orange-700">
+              Dividend pool (from welfare surplus)
+            </p>
+          </div>
+          <p className="max-w-xs text-[11px] leading-relaxed text-slate-500">
+            Distributed pro-rata by each artisan's verified service volume and
+            customer ratings. Zero-commission policy untouched — the pool comes
+            only from the welfare surplus.
+          </p>
+        </div>
+      </Panel>
+
+      <Panel title="Per-artisan earnings ledger" bodyClassName="p-0">
+        <div className="max-h-[420px] overflow-y-auto">
+          {ledger.length === 0 && (
+            <p className="py-10 text-center text-xs text-slate-500">
+              No settled bookings yet — the ledger fills as jobs complete.
+            </p>
+          )}
+          {ledger.map((e) => (
+            <div
+              key={e.artisanId}
+              className="flex items-center gap-3 border-b border-slate-100 px-4 py-3 last:border-0"
+            >
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-xs font-bold text-slate-900">{e.name}</p>
+                <p className="text-[11px] text-slate-500">{e.trade}</p>
+              </div>
+              <MonoBadge tone="neutral">{e.jobs} jobs</MonoBadge>
+              <span className="text-xs font-bold text-emerald-800">
+                ₹{e.earnings.toLocaleString("en-IN")}
+              </span>
+              <span className="hidden text-[11px] font-semibold text-orange-700 sm:inline">
+                +₹{e.welfare.toLocaleString("en-IN")} welfare
+              </span>
+            </div>
+          ))}
+        </div>
+        {ledger.length > 0 && (
+          <div className="border-t border-slate-200 bg-slate-50 px-4 py-2 text-[11px] text-slate-500">
+            Total direct worker earnings: ₹{totalEarnings.toLocaleString("en-IN")}
+          </div>
+        )}
+      </Panel>
+    </div>
+  );
+}
+
+/* ── Dispute Arbitration tab ── */
+
+const DISPUTE_CATEGORIES: Record<string, string> = {
+  late: "Late arrival",
+  quality: "Poor craftsmanship",
+  unsafe: "Unsafe work",
+  payment: "Payment dispute",
+  behavior: "Misconduct",
+  other: "Other",
+};
+
+function DisputesPanel() {
+  const disputes = useQuery(api.disputes.listForAdmin, {});
+  const resolve = useMutation(api.disputes.resolve);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [notes, setNotes] = useState<Record<string, string>>({});
+
+  async function handleResolve(
+    id: Id<"disputes">,
+    status: "resolved" | "dismissed" | "blacklisted",
+  ) {
+    setBusyId(id);
+    try {
+      await resolve({ id, status, resolution: notes[id] });
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  return (
+    <div>
+      <div className="mb-4 flex items-center gap-3">
+        <span className="flex size-9 items-center justify-center rounded-xl bg-rose-600 text-white">
+          <ShieldAlert className="size-4" />
+        </span>
+        <div>
+          <h2 className="text-base font-extrabold text-slate-900">
+            Dispute Arbitration Board
+          </h2>
+          <p className="text-xs text-slate-500">
+            Double-blind flags from customers and artisans — arbitrate fairly or blacklist abuse
+          </p>
+        </div>
+      </div>
+
+      <Panel bodyClassName="p-0">
+        <div className="max-h-[560px] overflow-y-auto">
+          {disputes === undefined && <LoadingPlaceholder text="Loading disputes…" />}
+          {disputes && disputes.length === 0 && (
+            <div className="py-12 text-center">
+              <CheckCircle2 className="mx-auto size-8 text-emerald-400" />
+              <p className="mt-2 text-sm font-bold text-slate-600">No disputes filed</p>
+              <p className="mt-1 text-xs text-slate-400">
+                Flags raised by customers or workers will appear here
+              </p>
+            </div>
+          )}
+          {disputes?.map((d) => (
+            <div key={d._id} className="border-b border-slate-100 px-4 py-3 last:border-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <MonoBadge tone={d.raisedByRole === "customer" ? "saffron" : "ok"}>
+                  {d.raisedByRole === "customer" ? "Customer flag" : "Artisan flag"}
+                </MonoBadge>
+                <MonoBadge tone="warn">{DISPUTE_CATEGORIES[d.category] ?? d.category}</MonoBadge>
+                <MonoBadge
+                  tone={
+                    d.status === "open" ? "warn" : d.status === "blacklisted" ? "neutral" : "ok"
+                  }
+                >
+                  {d.status}
+                </MonoBadge>
+                <Link
+                  to={`/bookings/${d.bookingId}`}
+                  className="ml-auto text-[11px] font-semibold text-emerald-700 hover:underline"
+                >
+                  View booking →
+                </Link>
+              </div>
+              <p className="mt-2 text-xs leading-relaxed text-slate-700">{d.details}</p>
+              {d.status === "open" ? (
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <input
+                    className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs text-slate-900 transition focus:border-emerald-500 focus:bg-white focus:outline-none"
+                    placeholder="Arbitration note (optional)…"
+                    value={notes[d._id] ?? ""}
+                    onChange={(e) => setNotes((n) => ({ ...n, [d._id]: e.target.value }))}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => void handleResolve(d._id, "resolved")}
+                    disabled={busyId === d._id}
+                    className="rounded-xl bg-emerald-600 px-3 py-1.5 text-[11px] font-bold text-white transition hover:bg-emerald-700 disabled:opacity-50"
+                  >
+                    Resolve for raiser
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleResolve(d._id, "dismissed")}
+                    disabled={busyId === d._id}
+                    className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-bold text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
+                  >
+                    Dismiss
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleResolve(d._id, "blacklisted")}
+                    disabled={busyId === d._id}
+                    className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-1.5 text-[11px] font-bold text-rose-700 transition hover:bg-rose-100 disabled:opacity-50"
+                  >
+                    Blacklist
+                  </button>
+                </div>
+              ) : (
+                d.resolution && (
+                  <p className="mt-1.5 text-[11px] italic text-slate-500">
+                    Board note: {d.resolution}
+                  </p>
+                )
               )}
             </div>
           ))}

@@ -21,6 +21,7 @@ import {
 import { api } from "@/convex/_generated/api";
 import type { Doc } from "@/convex/_generated/dataModel";
 import { RequireAuth } from "@/components/RequireAuth";
+import RequireAdmin from "@/components/RequireAdmin";
 import { useAuth } from "@/hooks/use-auth";
 
 /* ── Lazy route components (code-split portals) ─────────────── */
@@ -213,15 +214,7 @@ function RouteLoading() {
   );
 }
 
-/** Federation-officer gate: non-admins are bounced to their own portal home. */
-function RequireAdmin({ children }: { children: ReactNode }) {
-  const { session, isResolving } = useSession();
-  if (isResolving) return <RouteLoading />;
-  if (!session || session.role !== "admin") {
-    return <Navigate to={homeForSession(session)} replace />;
-  }
-  return <>{children}</>;
-}
+/** Federation-officer gate is now in components/RequireAdmin.tsx (uses RequireAuth). */
 
 /* ── Platform route-sync bridge (preview toolbar integration) ── */
 
