@@ -7,6 +7,7 @@ import {
   reverseGeocode,
   searchPlaces,
   accuracyText,
+  getAccuratePosition,
   HYD_CENTER,
   DEFAULT_ZOOM,
 } from "@/lib/geo";
@@ -120,21 +121,20 @@ export default function InteractiveMapPicker({
   const handleGps = useCallback(() => {
     if (!navigator.geolocation) return;
     setGpsLoading(true);
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
+    getAccuratePosition(12000)
+      .then((pos) => {
         const a = pos.coords.latitude;
         const b = pos.coords.longitude;
         setLat(a);
         setLng(b);
         setManualLat(a.toFixed(5));
-        setManualLng(b.toFixed(5));          setGpsAcc(pos.coords.accuracy);
-          setGpsLoading(false);
-          // eslint-disable-next-line react-hooks/set-state-in-effect
-          reverse(a, b); // syncs address from external Nominatim API
-      },
-      () => setGpsLoading(false),
-      { enableHighAccuracy: true, timeout: 10000 },
-    );
+        setManualLng(b.toFixed(5));
+        setGpsAcc(pos.coords.accuracy);
+        setGpsLoading(false);
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        reverse(a, b); // syncs address from external Nominatim API
+      })
+      .catch(() => setGpsLoading(false));
   }, [reverse]);
 
   // Search debounce

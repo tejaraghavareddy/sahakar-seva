@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { getAccuratePosition } from "@/lib/geo";
 
 export interface DetectedLocation {
   label: string;
@@ -57,8 +58,8 @@ export function useDetectedLocation() {
       if (!silent) setLocation(FALLBACK);
       return;
     }
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
+    getAccuratePosition(10000)
+      .then(async (pos) => {
         const { latitude, longitude, accuracy } = pos.coords;
         const label = await reverseGeocode(latitude, longitude);
         const next: DetectedLocation = {
@@ -71,15 +72,13 @@ export function useDetectedLocation() {
         };
         persist(next);
         setLocation(next);
-      },
-      () => {
+      })
+      .catch(() => {
         if (!silent) {
           persist(FALLBACK);
           setLocation(FALLBACK);
         }
-      },
-      { enableHighAccuracy: true, timeout: 8000 },
-    );
+      });
   }, []);
 
   useEffect(() => {

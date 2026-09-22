@@ -52,6 +52,56 @@ export function accuracyText(metres: number): string {
   return `±${Math.round(metres / 10) * 10} m`;
 }
 
+/**
+ * Get the most accurate GPS fix available: starts with getCurrentPosition,
+ * then keeps the best reading from watchPosition until accuracy ≤ 25 m
+ * or the timeout expires. Much more accurate than a single fix, which is
+ * often a cached low-precision network location.
+ */
+export function getAccuratePosition(timeoutMs = 12000): Promise<GeolocationPosition> {
+  return new Promise((resolve, reject) => {
+    if (typeof navigator === "undefined" || !navigator.geolocation) {
+      reject(new Error("Geolocation unsupported"));
+      return;
+    }
+    let best: GeolocationPosition | null = null;
+    let settled = false;
+    const finishOk = () => {
+      if (settled) return;
+      settled = true;
+      if (best) resolve(best);
+      else reject(new Error("No GPS fix"));
+    };
+    const finishErr = (err: unknown) => {
+      if (settled) return;
+      settled = true;
+      reject(err);
+    };
+    const consider = (p: GeolocationPosition) => {
+      if (!best || p.coords.accuracy < best.coords.accuracy) best = p;
+      if (best.coords.accuracy <= 25) {
+        navigator.geolocation.clearWatch(watchId);
+        clearTimeout(timer);
+        finishOk();
+      }
+    };
+    navigator.geolocation.getCurrentPosition(consider, finishErr, {
+      enableHighAccuracy: true,
+      timeout: timeoutMs,
+      maximumAge: 0,
+    });
+    const watchId = navigator.geolocation.watchPosition(
+      consider,
+      () => {},
+      { enableHighAccuracy: true, timeout: timeoutMs, maximumAge: 0 },
+    );
+    const timer = setTimeout(() => {
+      navigator.geolocation.clearWatch(watchId);
+      finishOk();
+    }, timeoutMs);
+  });
+}
+
 /** Default map center: Hyderabad, India. */
 export const HYD_CENTER = [17.385, 78.4867] as const;
 export const DEFAULT_ZOOM = 13;
@@ -63,7 +113,7 @@ export async function reverseGeocode(
 ): Promise<{ address: string; locality?: string; city?: string; pincode?: string }> {
   try {
     const res = await fetch(
-      `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&zoom=18`,
+      `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&zoom=19&addressdetails=1`,
       { headers: { "User-Agent": "SahakarSeva/1.0 (cooperative-gis)" } },
     );
     const data = await res.json();
