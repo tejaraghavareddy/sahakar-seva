@@ -1,13 +1,17 @@
+import { useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useAuth } from "@/hooks/use-auth";
 import { LanguagePicker } from "@/components/terminal";
+import LocationPickerModal from "@/components/map/LocationPickerModal";
+import { useDetectedLocation, formatAccuracy } from "@/lib/useLocation";
 import {
   CalendarClock,
   HardHat,
   Home,
   LogOut,
+  MapPin,
   RotateCcw,
   ShieldCheck,
 } from "lucide-react";
@@ -18,6 +22,8 @@ export function AppHeader() {
   const navigate = useNavigate();
   // Admin link renders only for federation officers (owner email or admin role).
   const amAdmin = useQuery(api.admin.amAdmin, {}) === true;
+  const { location, setManual } = useDetectedLocation();
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   const links = [
     { to: "/", label: "Home", icon: Home },
@@ -62,6 +68,23 @@ export function AppHeader() {
 
         {/* Right: utilities */}
         <div className="flex items-center gap-2">
+          {/* Live GPS accuracy badge + change location */}
+          <button
+            type="button"
+            onClick={() => setPickerOpen(true)}
+            title="Change service location"
+            className="hidden max-w-[16rem] items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-700 shadow-xs transition hover:border-emerald-300 hover:text-emerald-800 sm:inline-flex"
+          >
+            <span className="relative flex size-2 shrink-0">
+              <span className="absolute inline-flex size-2 animate-ping rounded-full bg-emerald-400 opacity-75" />
+              <span className="relative inline-flex size-2 rounded-full bg-emerald-500" />
+            </span>
+            <MapPin className="size-3 shrink-0 text-emerald-600" />
+            <span className="truncate">{location.label}</span>
+            <span className="shrink-0 rounded border border-emerald-200 bg-emerald-50 px-1 text-[10px] font-bold text-emerald-700">
+              {formatAccuracy(location)}
+            </span>
+          </button>
           <span className="hidden items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 md:inline-flex">
             📱 Mobile
           </span>
@@ -76,6 +99,21 @@ export function AppHeader() {
           </button>
         </div>
       </div>
+      {/* Location picker modal */}
+      <LocationPickerModal
+        open={pickerOpen}
+        initialLat={location.lat}
+        initialLng={location.lng}
+        onConfirm={(loc) => {
+          setManual({
+            label: loc.address,
+            lat: loc.lat,
+            lng: loc.lng,
+          });
+          setPickerOpen(false);
+        }}
+        onClose={() => setPickerOpen(false)}
+      />
       {/* mobile nav */}
       <nav className="flex items-center justify-center gap-1 border-t border-slate-100 px-2 py-1.5 lg:hidden">
         {links.map((l) => (

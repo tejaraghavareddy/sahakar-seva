@@ -4,7 +4,8 @@ import { useLang } from "@/lib/i18n";
 import { SERVICES, TRADES, COLOR_SOFT } from "@/lib/trades";
 import { AppHeader } from "@/components/AppHeader";
 import { MonoBadge } from "@/components/terminal";
-import { useDetectedLocation, formatCoords, formatAccuracy } from "@/lib/useLocation";
+import { useDetectedLocation, formatAccuracy } from "@/lib/useLocation";
+import { haversine, formatDistance, estimateEtaMinutes } from "@/lib/geo";
 import {
   Search,
   ArrowRight,
@@ -15,29 +16,58 @@ import {
   ShieldCheck,
   Siren,
   Plus,
+  Navigation,
 } from "lucide-react";
 
 type Tab = "artisans" | "radar" | "orders";
+
+/** Pinned service coordinates per trade so proximity distances are realistic. */
+const TRADE_PINS: Record<string, [number, number]> = {
+  electrician: [17.3969, 78.4383],
+  plumber: [17.4239, 78.4521],
+  carpenter: [17.4092, 78.5004],
+  mason: [17.3602, 78.5211],
+  painter: [17.4126, 78.4192],
+  appliance: [17.3701, 78.4703],
+};
+const EMERGENCY_RADIUS_M = 3000;
 
 export default function Services() {
   const { t } = useLang();
   const [q, setQ] = useState("");
   const [trade, setTrade] = useState<string>("all");
   const [tab, setTab] = useState<Tab>("artisans");
+  const [sortByDistance, setSortByDistance] = useState(true);
+  const [emergencyMode, setEmergencyMode] = useState(false);
   const { location, detect } = useDetectedLocation();
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
-    return SERVICES.filter((s) => {
+    let list = SERVICES.map((s) => {
+      const pin = TRADE_PINS[s.trade];
+      const dist = pin ? haversine(location.lat, location.lng, pin[0], pin[1]) : null;
+      return { ...s, distM: dist, etaM: dist !== null ? estimateEtaMinutes(dist) : null };
+    }).filter((s) => {
       const inTrade = trade === "all" || s.trade === trade;
       const inSearch =
         !needle ||
         s.name.toLowerCase().includes(needle) ||
         s.desc.toLowerCase().includes(needle) ||
         s.trade.includes(needle);
-      return inTrade && inSearch;
+      const inEmergency =
+        !emergencyMode ||
+        (s.urgent && s.distM !== null && s.distM <= EMERGENCY_RADIUS_M);
+      return inTrade && inSearch && inEmergency;
     });
-  }, [q, trade]);
+    if (sortByDistance) {
+      list = [...list].sort(
+        (a, b) => (a.distM ?? Infinity) - (b.distM ?? Infinity),
+      );
+    }
+    return list;
+  }, [q, trade, location, sortByDistance, emergencyMode]);
+
+  const nearest = filtered.length > 0 ? filtered[0] : null;
 
   return (
     <div className="flex min-h-screen flex-col bg-gradient-to-b from-slate-50 via-emerald-50/30 to-slate-100 font-sans text-slate-900 antialiased">
@@ -76,6 +106,18 @@ export default function Services() {
               Change
             </Link>
           </span>
+          <button
+            type="button"
+            onClick={() => setEmergencyMode((v) => !v)}
+            className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-bold shadow-xs transition active:scale-95 ${
+              emergencyMode
+                ? "border-rose-600 bg-rose-600 text-white"
+                : "border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100"
+            }`}
+          >
+            <Siren className="size-3.5" />
+            {emergencyMode ? "Emergency dispatch active" : "Emergency Rapid Dispatch"}
+          </button>
           <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-700 shadow-xs">
             <HardHat className="size-3.5 text-teal-700" />
             I'm a Worker →
@@ -93,7 +135,7 @@ export default function Services() {
                 <span className="text-emerald-100">{location.label}</span>
               </p>
               <p className="mt-0.5 text-[10px] text-emerald-300/70">
-                GPS: {formatCoords(location)} · {formatAccuracy(location)}
+                GPS: {location.lat.toFixed(4)}, {location.lng.toFixed(4)} · {formatAccuracy(location)}
               </p>
               <h1 className="mt-3 text-2xl font-black leading-tight tracking-tight text-white sm:text-4xl">
                 Book Verified Skilled
@@ -185,7 +227,21 @@ export default function Services() {
                 label="24x7 Emergency"
                 icon={<Siren className="size-3 text-rose-500" />}
               />
+              <FilterChip
+                active={sortByDistance}
+                onClick={() => setSortByDistance((v) => !v)}
+                label="Closest to Me First"
+                icon={<Navigation className="size-3 text-emerald-600" />}
+              />
             </div>
+
+            {emergencyMode && (
+              <p className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-xs font-semibold text-rose-800">
+                ⚡ Rapid dispatch mode — highlighting the closest urgent service
+                within {EMERGENCY_RADIUS_M / 1000} km of your confirmed GPS
+                location.
+              </p>
+            )}
 
             {/* Grid */}
             <div className="mt-6 grid gap-4 pb-14 sm:grid-cols-2 lg:grid-cols-3">
@@ -194,7 +250,16 @@ export default function Services() {
                 const soft = COLOR_SOFT[s.color] ?? COLOR_SOFT.ok;
                 return (
                   <Link key={s.id} to={`/services/${s.id}`} className="h-full">
-                    <article className="flex h-full flex-col justify-between rounded-2xl border border-slate-200 bg-white p-5 shadow-xs transition hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-md">
+                    <article className={`flex h-full flex-col justify-between rounded-2xl border p-5 shadow-xs transition hover:-translate-y-0.5 hover:shadow-md ${
+                      emergencyMode && s.id === nearest?.id
+                        ? "border-rose-400 bg-rose-50/40 ring-1 ring-rose-300"
+                        : "border-slate-200 bg-white hover:border-emerald-300"
+                    }`}>
+                      {emergencyMode && s.id === nearest?.id && (
+                        <span className="mb-2 w-fit rounded-full bg-rose-600 px-2 py-0.5 text-[10px] font-black text-white">
+                          ⚡ FASTEST AVAILABLE
+                        </span>
+                      )}
                       <div>
                         <div className="flex items-start justify-between">
                           <span
@@ -211,6 +276,13 @@ export default function Services() {
                         <h2 className="mt-3.5 text-sm font-bold text-slate-900">
                           {s.name}
                         </h2>
+                        {s.distM !== null && (
+                          <p className="mt-1 inline-flex w-fit items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
+                            <Navigation className="size-2.5" />
+                            {formatDistance(s.distM!)} away · ~{s.etaM} min
+                            arrival
+                          </p>
+                        )}
                         <p className="tl-line-clamp-2 mt-1 text-sm leading-6 text-slate-500 italic">
                           {s.desc}
                         </p>

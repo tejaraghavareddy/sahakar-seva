@@ -8,6 +8,7 @@ import { getTrade, COLOR_SOFT } from "@/lib/trades";
 import { AppHeader } from "@/components/AppHeader";
 import { MonoBadge, Panel, StatusDot, TlButton } from "@/components/terminal";
 import FederationGISMap from "@/components/map/FederationGISMap";
+import LocationPickerModal from "@/components/map/LocationPickerModal";
 import {
   Loader2,
   ShieldAlert,
@@ -522,6 +523,9 @@ function SocietiesPanel() {
   const [district, setDistrict] = useState("");
   const [state, setState] = useState("Telangana");
   const [jurisdiction, setJurisdiction] = useState("");
+  const [contactPhone, setContactPhone] = useState("");
+  const [hq, setHq] = useState<{ lat: number; lng: number; address: string } | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [busy, setBusy] = useState(false);
 
   async function handleRegister() {
@@ -533,10 +537,16 @@ function SocietiesPanel() {
         district: district.trim(),
         state,
         jurisdiction: jurisdiction.trim() || undefined,
+        contactPhone: contactPhone.trim() || undefined,
+        lat: hq?.lat,
+        lng: hq?.lng,
+        address: hq?.address,
       });
       setName("");
       setDistrict("");
       setJurisdiction("");
+      setContactPhone("");
+      setHq(null);
       setShowForm(false);
     } finally {
       setBusy(false);
@@ -587,7 +597,39 @@ function SocietiesPanel() {
               <label className="mb-0.5 block text-[10px] font-bold uppercase tracking-wider text-slate-400">Jurisdiction (optional)</label>
               <input className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 transition focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20" value={jurisdiction} onChange={(e) => setJurisdiction(e.target.value)} placeholder="e.g. Secunderabad, Malkajgiri mandals" />
             </div>
+            <div>
+              <label className="mb-0.5 block text-[10px] font-bold uppercase tracking-wider text-slate-400">Branch secretary phone (optional)</label>
+              <input className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 transition focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20" value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} placeholder="e.g. +91 98XXXXXX21" />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="mb-0.5 block text-[10px] font-bold uppercase tracking-wider text-slate-400">Headquarters location</label>
+              <button
+                type="button"
+                onClick={() => setPickerOpen(true)}
+                className="flex w-full items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-left text-sm transition hover:border-emerald-400"
+              >
+                <Map className="size-4 shrink-0 text-emerald-600" />
+                <span className="truncate text-slate-700">
+                  {hq ? hq.address : "Pin the society HQ on the map…"}
+                </span>
+                {hq && (
+                  <span className="ml-auto shrink-0 rounded border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700">
+                    {hq.lat.toFixed(4)}, {hq.lng.toFixed(4)}
+                  </span>
+                )}
+              </button>
+            </div>
           </div>
+          <LocationPickerModal
+            open={pickerOpen}
+            initialLat={hq?.lat}
+            initialLng={hq?.lng}
+            onConfirm={(loc) => {
+              setHq({ lat: loc.lat, lng: loc.lng, address: loc.address });
+              setPickerOpen(false);
+            }}
+            onClose={() => setPickerOpen(false)}
+          />
           <div className="mt-3 flex justify-end">
             <TlButton onClick={() => void handleRegister()} disabled={busy || !name.trim() || !district.trim()}>
               {busy ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}

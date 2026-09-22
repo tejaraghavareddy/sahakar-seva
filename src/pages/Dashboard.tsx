@@ -7,6 +7,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useLang } from "@/lib/i18n";
 import { getTrade } from "@/lib/trades";
 import { stopSpeaking } from "@/lib/speech";
+import { haversine, formatDistance, estimateEtaMinutes } from "@/lib/geo";
 import {
   LanguagePicker,
   MonoBadge,
@@ -19,6 +20,7 @@ import { IdCardDialog } from "@/components/IdCardDialog";
 import {
   Loader2,
   LogOut,
+  Navigation,
   Radio,
   Radar,
   Briefcase,
@@ -166,6 +168,28 @@ export default function Dashboard() {
   }
 
   const online = artisan?.isOnline ?? false;
+
+  function offerDistance(b: { lat?: number; lng?: number }) {
+    if (!artisan?.lat || !artisan?.lng || b.lat === undefined || b.lng === undefined)
+      return null;
+    return haversine(artisan.lat!, artisan.lng!, b.lat, b.lng);
+  }
+
+  function openExternalMaps(b: { lat?: number; lng?: number; address: string }) {
+    if (b.lat !== undefined && b.lng !== undefined) {
+      window.open(
+        `https://www.google.com/maps/dir/?api=1&destination=${b.lat},${b.lng}&travelmode=driving`,
+        "_blank",
+        "noopener",
+      );
+    } else {
+      window.open(
+        `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(b.address)}`,
+        "_blank",
+        "noopener",
+      );
+    }
+  }
   const trade = artisan ? getTrade(artisan.trade) : undefined;
   const TradeIcon = trade?.icon;
   const mine = jobs?.mine ?? [];
@@ -401,6 +425,15 @@ export default function Dashboard() {
                           {b.address.slice(0, 44)} · ₹{b.total} · you earn ₹
                           {b.workerShare}
                         </p>
+                        {(() => {
+                          const d = offerDistance(b);
+                          return d !== null ? (
+                            <p className="text-[11px] font-bold text-emerald-700">
+                              📍 {formatDistance(d)} away · ~{estimateEtaMinutes(d)}
+                              min travel
+                            </p>
+                          ) : null;
+                        })()}
                         <p className="text-[11px] font-semibold text-emerald-700">
                           {new Date(b.scheduledFor).toLocaleString("en-IN", {
                             dateStyle: "medium",
@@ -471,6 +504,25 @@ export default function Dashboard() {
                             t(stageKeys[b.status])
                           )}
                         </TlButton>
+                      )}
+                      {["accepted", "enroute"].includes(b.status) && (
+                        <div className="flex shrink-0 flex-col gap-1">
+                          <Link to={`/bookings/${b._id}`}>
+                            <TlButton
+                              className="h-7 gap-1 px-2.5 text-[11px]"
+                              title="Open in-app navigation map"
+                            >
+                              <Navigation className="size-3" /> Navigate
+                            </TlButton>
+                          </Link>
+                          <button
+                            type="button"
+                            onClick={() => openExternalMaps(b)}
+                            className="rounded-lg border border-slate-200 px-2 py-0.5 text-[10px] font-semibold text-slate-500 transition hover:bg-slate-50 hover:text-emerald-700"
+                          >
+                            Open in Maps ↗
+                          </button>
+                        </div>
                       )}
                     </div>
                   ))}

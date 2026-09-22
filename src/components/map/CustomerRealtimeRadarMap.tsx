@@ -28,6 +28,34 @@ interface CustomerRadarMapProps {
   height?: string;
 }
 
+const ARRIVED_RADIUS_M = 50;
+
+function playArrivalChime() {
+  try {
+    const Ctx =
+      window.AudioContext ??
+      (window as unknown as { webkitAudioContext?: typeof AudioContext })
+        .webkitAudioContext;
+    if (!Ctx) return;
+    const ctx = new Ctx();
+    const notes = [880, 1108.7, 1318.5]; // pleasant A5–C#6–E6 triad
+    notes.forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.frequency.value = freq;
+      osc.type = "sine";
+      gain.gain.setValueAtTime(0.0001, ctx.currentTime + i * 0.18);
+      gain.gain.exponentialRampToValueAtTime(0.18, ctx.currentTime + i * 0.18 + 0.03);
+      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + i * 0.18 + 0.5);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(ctx.currentTime + i * 0.18);
+      osc.stop(ctx.currentTime + i * 0.18 + 0.55);
+    });
+  } catch {
+    /* audio unavailable */
+  }
+}
+
 /** Fit bounds to show both markers. */
 function FitBounds({ cLat, cLng, wLat, wLng }: { cLat: number; cLng: number; wLat: number; wLng: number }) {
   const map = useMap();
@@ -46,8 +74,18 @@ export default function CustomerRealtimeRadarMap({
   height = "300px",
 }: CustomerRadarMapProps) {
   const [simProgress, setSimProgress] = useState(0);
+  const [arrived, setArrived] = useState(false);
   const workerDist = worker ? haversine(worker.lat, worker.lng, customerLat, customerLng) : 0;
   const workerEta = worker ? estimateEtaMinutes(workerDist) : 0;
+
+  // When the worker's real telemetry comes within 50 m, mark arrival + chime once
+  useEffect(() => {
+    if (!worker || arrived) return;
+    if (workerDist <= ARRIVED_RADIUS_M) {
+      setArrived(true);
+      playArrivalChime();
+    }
+  }, [worker, workerDist, arrived]);
 
   // Simulate smooth interpolation toward destination
   useEffect(() => {
@@ -128,16 +166,26 @@ export default function CustomerRealtimeRadarMap({
 
       {/* Info chips */}
       {worker && (
-        <div className="flex items-center gap-2 border-t border-slate-200 px-4 py-2.5">
-          <span className="flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-[11px] font-bold text-emerald-800">
-            🛵 {worker.name}
-          </span>
-          <span className="text-[11px] text-slate-500">
-            {formatDistance(workerDist)} away
-          </span>
-          <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-semibold text-slate-700">
-            ETA ~{workerEta} min
-          </span>
+        <div className="flex flex-wrap items-center gap-2 border-t border-slate-200 px-4 py-2.5">
+          {arrived ? (
+            <span className="flex w-full items-center gap-2 rounded-xl border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-800">
+              <span className="size-2 animate-pulse rounded-full bg-emerald-500" />
+              ✅ Artisan Arrived at Doorstep — {worker.name} is at your gate.
+              Please welcome them in.
+            </span>
+          ) : (
+            <>
+              <span className="flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-[11px] font-bold text-emerald-800">
+                🛵 {worker.name}
+              </span>
+              <span className="text-[11px] text-slate-500">
+                {formatDistance(workerDist)} away
+              </span>
+              <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-semibold text-slate-700">
+                Arriving in ~{workerEta} min
+              </span>
+            </>
+          )}
         </div>
       )}
     </div>
