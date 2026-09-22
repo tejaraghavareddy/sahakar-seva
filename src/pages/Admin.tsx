@@ -1,6 +1,6 @@
 import { Link } from "react-router";
 import { useState } from "react";
-import { useMutation, useQuery } from "convex/react";
+import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { useLang } from "@/lib/i18n";
@@ -232,7 +232,7 @@ function GISPanel() {
     <div>
       <div className="mb-4 flex items-center gap-3">
         <span className="flex size-9 items-center justify-center rounded-xl bg-emerald-600 text-white">
-          <Map className="size-4.5" />
+          <Map className="size-4" />
         </span>
         <div>
           <h2 className="text-base font-extrabold text-slate-900">Federation GIS Command Map</h2>
@@ -262,10 +262,11 @@ function GISPanel() {
 
 function ForecastPanel() {
   const latest = useQuery(api.forecasts.latest, {});
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const forecastAction = useMutation(api.forecastAi.runForecast as any);
+  const forecastAction = useAction(api.forecastAi.runForecast);
   const [forecasting, setForecasting] = useState(false);
-  const [forecast, setForecast] = useState<any>(null);
+  const [forecast, setForecast] = useState<Awaited<
+    ReturnType<typeof forecastAction>
+  > | { error: string } | null>(null);
   const [kind, setKind] = useState<"forecast" | "stabilization">("forecast");
 
   async function runForecast() {
@@ -287,7 +288,7 @@ function ForecastPanel() {
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <span className="flex size-9 items-center justify-center rounded-xl bg-emerald-600 text-white">
-            <BrainCircuit className="size-4.5" />
+            <BrainCircuit className="size-4" />
           </span>
           <div>
             <h2 className="text-base font-extrabold text-slate-900">Gemini AI Demand Forecast</h2>
@@ -406,8 +407,7 @@ function GovernancePanel() {
   return (
     <div>
       <div className="mb-4 flex items-center gap-3">
-        <span className="flex size-9 items-center justify-center rounded-xl bg-emerald-600 text-white">
-          <ShieldCheck className="size-4.5" />
+        <span className="flex size-9 items-center justify-center rounded-xl bg-emerald-600 text-white">            <ShieldCheck className="size-4" />
         </span>
         <div>
           <h2 className="text-base font-extrabold text-slate-900">Artisan Verification Queue</h2>
@@ -515,7 +515,7 @@ function SocietiesPanel() {
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <span className="flex size-9 items-center justify-center rounded-xl bg-emerald-600 text-white">
-            <Building2 className="size-4.5" />
+            <Building2 className="size-4" />
           </span>
           <div>
             <h2 className="text-base font-extrabold text-slate-900">District Cooperative Societies</h2>

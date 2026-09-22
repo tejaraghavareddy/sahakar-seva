@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { HardHat } from "lucide-react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Doc } from "@/convex/_generated/dataModel";
@@ -79,6 +80,7 @@ export default function Onboarding() {
   const navigate = useNavigate();
 
   const [step, setStep] = useState<Step>(1);
+  const [mode, setMode] = useState<"register" | "signin">("register");
   const [form, setForm] = useState<ProfileForm>(EMPTY_FORM);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -172,17 +174,75 @@ export default function Onboarding() {
       </header>
 
       <main className="mx-auto w-full max-w-3xl px-4 py-8 sm:px-6">
+        {/* ── Skilled Worker & Artisan Portal header card ────── */}
+        <div className="mb-6 flex flex-col items-center rounded-3xl border border-slate-200 bg-white px-6 py-8 text-center shadow-xs">
+          <span className="flex size-16 items-center justify-center rounded-2xl bg-teal-100 text-teal-700">
+            <HardHat className="size-8" />
+          </span>
+          <h1 className="mt-4 text-2xl font-black tracking-tight text-slate-900">
+            Skilled Worker &amp; Artisan Portal
+          </h1>
+          <p className="mt-1.5 text-xs text-slate-500 italic">
+            Cooperative Roster Registration · Skill Competancy Checks &amp;
+            Verified Trade Credentials
+          </p>
+          {/* Register / Sign-in toggle */}
+          <div className="mt-5 grid w-full max-w-md grid-cols-2 gap-1 rounded-xl border border-slate-200 bg-slate-50 p-1">
+            <button
+              type="button"
+              onClick={() => setMode("register")}
+              className={`rounded-lg px-3 py-2 text-xs font-bold transition ${
+                mode === "register"
+                  ? "bg-white text-slate-900 shadow-xs"
+                  : "text-slate-500 hover:text-slate-800"
+              }`}
+            >
+              Register New Skilled Worker
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode("signin")}
+              className={`rounded-lg px-3 py-2 text-xs font-bold transition ${
+                mode === "signin"
+                  ? "bg-white text-slate-900 shadow-xs"
+                  : "text-slate-500 hover:text-slate-800"
+              }`}
+            >
+              Worker Sign In
+            </button>
+          </div>
+          {mode === "signin" && (
+            <div className="mt-4 w-full max-w-md rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-4 text-left">
+              <p className="text-xs font-semibold text-emerald-900">
+                Already registered with a district society?
+              </p>
+              <p className="mt-1 text-[11px] leading-relaxed text-emerald-800/80 italic">
+                Sign in with your email to reach your worker hub, live service
+                requests and telemetry dashboard. New here? Switch back to
+                Register and complete the three steps.
+              </p>
+              <Link
+                to="/auth?returnTo=/dashboard"
+                className="mt-3 inline-flex items-center gap-2 rounded-xl bg-teal-900 px-4 py-2.5 text-xs font-bold text-white transition hover:bg-teal-800 active:scale-95"
+              >
+                Continue to Sign In →
+              </Link>
+            </div>
+          )}
+        </div>
+
+        {mode === "signin" ? null : (
+        <>
         <SectionHeader title={t("ob_title")} sub={t("ob_sub")} />
 
         {/* Step rail */}
-        <div className="mt-5 grid grid-cols-4 gap-2">
+        <div className="mt-5 grid grid-cols-3 gap-2">
           {(
             [
               [1, t("step_profile")],
               [2, t("step_identity")],
               [3, t("step_skill")],
-              [4, t("step_credential")],
-            ] as const
+            ] as [number, string][]
           ).map(([n, label]) => {
             const active = step === n;
             const done = step > n;
@@ -285,6 +345,8 @@ export default function Onboarding() {
             )}
           </AnimatePresence>
         </div>
+        </>
+        )}
       </main>
     </div>
   );
