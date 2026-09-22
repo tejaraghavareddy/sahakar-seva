@@ -53,7 +53,6 @@ export default function Book() {
   const [slot, setSlot] = useState("10:00");
   const [asap, setAsap] = useState(false);
   const [notes, setNotes] = useState("");
-  const [welfare, setWelfare] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lat, setLat] = useState<number | undefined>();
@@ -74,8 +73,11 @@ export default function Book() {
     );
   }
 
-  const welfareAmt = welfare ? Math.round(svc.base * 0.03) : 0;
-  const total = svc.base + welfareAmt;
+  // Cooperative revenue split: 90% worker / 7% welfare / 3% operations.
+  const workerShare = Math.round(svc.base * 0.9);
+  const welfareAmt = Math.round(svc.base * 0.07);
+  const opsAmt = svc.base - workerShare - welfareAmt;
+  const total = svc.base;
   const soft = COLOR_SOFT[svc.color] ?? COLOR_SOFT.ok;
   const Icon = svc.icon;
 
@@ -99,7 +101,7 @@ export default function Book() {
         scheduledFor: scheduled.getTime(),
         urgent: asap && svc.urgent,
         notes: notes || undefined,
-        welfareOptIn: welfare,
+        welfareOptIn: true,
       });
       navigate(`/bookings/${bookingId}`);
     } catch (e) {
@@ -273,44 +275,41 @@ export default function Book() {
             />
           </Panel>
 
-          {/* Welfare */}
-          <button
-            type="button"
-            onClick={() => setWelfare((v) => !v)}
-            className="text-left"
-          >
-            <Panel
-              className={
-                welfare ? "border-orange-300 bg-orange-50" : "hover:border-emerald-300"
-              }
-              bodyClassName="p-4"
-            >
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="flex items-center gap-1.5 text-xs font-bold text-orange-800">
-                    <HeartHandshake className="size-4" />
-                    {t("bk_welfare", { amt: Math.round(svc.base * 0.03) })}
-                  </p>
-                  <p className="mt-0.5 text-[11px] leading-4 text-slate-600">
-                    {t("bk_welfare_desc")}
-                  </p>
-                </div>
-                <span
-                  className={`relative h-5 w-9 shrink-0 rounded-full border transition-colors ${
-                    welfare
-                      ? "border-orange-600 bg-orange-600"
-                      : "border-slate-200 bg-slate-100"
-                  }`}
-                >
-                  <span
-                    className={`absolute top-0.5 size-4 rounded-full bg-white shadow transition-all ${
-                      welfare ? "left-[18px]" : "left-0.5"
-                    }`}
-                  />
-                </span>
+          {/* Cooperative distribution notice */}
+          <Panel className="border-orange-200 bg-orange-50/50" bodyClassName="p-4">
+            <p className="flex items-center gap-1.5 text-xs font-bold text-orange-800">
+              <HeartHandshake className="size-4" />
+              Cooperative distribution — no middleman commission
+            </p>
+            <div className="mt-2.5 grid grid-cols-3 gap-2 text-center">
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-2 py-2">
+                <p className="text-sm font-black text-emerald-800">90%</p>
+                <p className="text-[10px] font-semibold text-emerald-700">
+                  Worker payout
+                </p>
+                <p className="text-[10px] text-emerald-600">₹{workerShare}</p>
               </div>
-            </Panel>
-          </button>
+              <div className="rounded-xl border border-orange-200 bg-orange-50 px-2 py-2">
+                <p className="text-sm font-black text-orange-800">7%</p>
+                <p className="text-[10px] font-semibold text-orange-700">
+                  Welfare fund
+                </p>
+                <p className="text-[10px] text-orange-600">₹{welfareAmt}</p>
+              </div>
+              <div className="rounded-xl border border-slate-200 bg-white px-2 py-2">
+                <p className="text-sm font-black text-slate-800">3%</p>
+                <p className="text-[10px] font-semibold text-slate-600">
+                  Operations
+                </p>
+                <p className="text-[10px] text-slate-500">₹{opsAmt}</p>
+              </div>
+            </div>
+            <p className="mt-2 text-[11px] leading-4 text-slate-600">
+              Every rupee is split transparently — the artisan receives 90%
+              directly via UPI, 7% funds the worker welfare pool, and 3% keeps
+              dispatch and verification running.
+            </p>
+          </Panel>
 
           {/* Price summary */}
           <Panel title={t("bk_summary")}>
@@ -320,10 +319,18 @@ export default function Book() {
                 <span className="font-semibold text-slate-900">₹{svc.base}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-500">{t("bk_welfare_row")}</span>
-                <span className="font-semibold text-slate-900">
-                  {welfareAmt > 0 ? `₹${welfareAmt}` : "—"}
+                <span className="text-slate-500">Worker receives (90%)</span>
+                <span className="font-semibold text-emerald-800">
+                  ₹{workerShare}
                 </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Welfare fund (7%)</span>
+                <span className="font-semibold text-orange-800">₹{welfareAmt}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Operations (3%)</span>
+                <span className="font-semibold text-slate-900">₹{opsAmt}</span>
               </div>
               <div className="flex justify-between border-t border-dashed border-slate-200 pt-2">
                 <span className="font-bold text-slate-900">{t("bk_total")}</span>

@@ -221,7 +221,17 @@ export default function InteractiveMapPicker({
           />
           <MapHooks onMoveEnd={handleMoveEnd} />
           <Recenter lat={lat} lng={lng} />
-          <Marker position={[lat, lng]} icon={defaultIcon} draggable />
+          <Marker
+            position={[lat, lng]}
+            icon={defaultIcon}
+            draggable
+            eventHandlers={{
+              dragend: (e) => {
+                const p = (e.target as L.Marker).getLatLng();
+                handleMoveEnd(p.lat, p.lng);
+              },
+            }}
+          />
         </MapContainer>
       </div>
 

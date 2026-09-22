@@ -49,6 +49,7 @@ export default function Dashboard() {
   const [toggling, setToggling] = useState(false);
   const [accepting, setAccepting] = useState<string | null>(null);
   const [busyAdvance, setBusyAdvance] = useState<string | null>(null);
+  const [acceptError, setAcceptError] = useState<string | null>(null);
 
   useEffect(() => () => stopSpeaking(), []);
 
@@ -115,8 +116,15 @@ export default function Dashboard() {
 
   async function handleAccept(id: Id<"bookings">) {
     setAccepting(id);
+    setAcceptError(null);
     try {
       await acceptJob({ id });
+    } catch (e) {
+      setAcceptError(
+        e instanceof Error
+          ? e.message
+          : "Could not accept this job — please try again.",
+      );
     } finally {
       setAccepting(null);
     }
@@ -124,8 +132,13 @@ export default function Dashboard() {
 
   async function handleAdvance(id: Id<"bookings">) {
     setBusyAdvance(id);
+    setAcceptError(null);
     try {
       await advance({ id });
+    } catch (e) {
+      setAcceptError(
+        e instanceof Error ? e.message : "Could not update the job stage.",
+      );
     } finally {
       setBusyAdvance(null);
     }
@@ -157,9 +170,11 @@ export default function Dashboard() {
   const TradeIcon = trade?.icon;
   const mine = jobs?.mine ?? [];
   const radar = jobs?.radar ?? [];
-  const earned = mine
-    .filter((b) => b.status === "settled" || b.status === "completed")
-    .reduce((sum, b) => sum + b.base, 0);
+  const jobDone = mine.filter(
+    (b) => b.status === "settled" || b.status === "completed",
+  );
+  const earned = jobDone.reduce((sum, b) => sum + b.workerShare, 0);
+  const verified = artisan?.kycStatus === "verified" && artisan?.quizPassed;
 
   const stageKeys: Record<string, string> = {
     accepted: "st_enroute",
@@ -299,7 +314,7 @@ export default function Dashboard() {
               {/* Earnings */}
               <Panel title={t("earnings_title")} bodyClassName="p-4">
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
+                  <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-3">
                     <p className="tl-label">{t("earn_collected")}</p>
                     <p className="mt-1 text-lg font-black text-emerald-800">
                       ₹{earned.toLocaleString("en-IN")}
@@ -312,7 +327,18 @@ export default function Dashboard() {
                     </p>
                   </div>
                 </div>
-                <p className="mt-3 text-[11px] leading-4 text-slate-500">
+                <div className="mt-3 flex flex-wrap items-center gap-1.5 text-[10px] font-semibold text-slate-500">
+                  <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-emerald-800">
+                    Worker 90%
+                  </span>
+                  <span className="rounded-full border border-orange-200 bg-orange-50 px-2 py-0.5 text-orange-800">
+                    Welfare 7%
+                  </span>
+                  <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-slate-600">
+                    Operations 3%
+                  </span>
+                </div>
+                <p className="mt-2 text-[11px] leading-4 text-slate-500">
                   {t("ledger_note")}
                 </p>
               </Panel>
@@ -341,6 +367,18 @@ export default function Dashboard() {
                 tag={`${radar.length}`}
                 bodyClassName="p-0"
               >
+                {acceptError && (
+                  <p className="border-b border-amber-200 bg-amber-50 px-4 py-2.5 text-[11px] font-semibold text-amber-800">
+                    ⚠ {acceptError}
+                  </p>
+                )}
+                {!verified && radar.length > 0 && (
+                  <p className="border-b border-amber-200 bg-amber-50 px-4 py-2.5 text-[11px] font-semibold text-amber-800">
+                    ⚠ Complete your KYC verification and skill check to accept
+                    jobs. Your federation officer approves KYC in the admin
+                    console.
+                  </p>
+                )}
                 <div className="divide-y divide-slate-100">
                   {radar.length === 0 && (
                     <p className="px-5 py-10 text-center text-xs text-slate-500">
@@ -360,13 +398,25 @@ export default function Dashboard() {
                           {b.serviceName}
                         </p>
                         <p className="truncate text-[11px] text-slate-500">
-                          {b.address.slice(0, 44)} · ₹{b.total}
+                          {b.address.slice(0, 44)} · ₹{b.total} · you earn ₹
+                          {b.workerShare}
+                        </p>
+                        <p className="text-[11px] font-semibold text-emerald-700">
+                          {new Date(b.scheduledFor).toLocaleString("en-IN", {
+                            dateStyle: "medium",
+                            timeStyle: "short",
+                          })}
                         </p>
                       </div>
                       <TlButton
                         className="h-8 px-3 text-xs"
                         onClick={() => handleAccept(b._id)}
-                        disabled={accepting === b._id}
+                        disabled={accepting === b._id || !verified}
+                        title={
+                          !verified
+                            ? "KYC verification + skill check required"
+                            : undefined
+                        }
                       >
                         {accepting === b._id ? (
                           <Loader2 className="size-3.5 animate-spin" />

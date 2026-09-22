@@ -32,11 +32,15 @@ export const overview = query({
     const byStatus: Record<string, number> = {};
     let revenueSettled = 0;
     let welfarePool = 0;
+    let workerPayouts = 0;
+    let opsPool = 0;
     for (const b of bookings) {
       byStatus[b.status] = (byStatus[b.status] ?? 0) + 1;
       if (b.status === "settled" || b.status === "completed") {
         revenueSettled += b.base;
-        welfarePool += b.welfareAmt;
+        welfarePool += b.welfareAmt ?? 0;
+        workerPayouts += b.workerShare ?? Math.round(b.base * 0.9);
+        opsPool += b.opsAmt ?? Math.max(0, b.base - (b.welfareAmt ?? 0) - Math.round(b.base * 0.9));
       }
     }
 
@@ -56,6 +60,8 @@ export const overview = query({
       byStatus,
       revenueSettled,
       welfarePool,
+      workerPayouts,
+      opsPool,
       workers: artisans.length,
       online,
       verified,

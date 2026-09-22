@@ -1,4 +1,6 @@
 import { Link, useNavigate } from "react-router";
+import { useQuery } from "convex/react";
+import { api } from "@/convex/_generated/api";
 import { useAuth } from "@/hooks/use-auth";
 import { LanguagePicker } from "@/components/terminal";
 import {
@@ -14,12 +16,16 @@ import {
 export function AppHeader() {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
+  // Admin link renders only for federation officers (owner email or admin role).
+  const amAdmin = useQuery(api.admin.amAdmin, {}) === true;
 
   const links = [
     { to: "/", label: "Home", icon: Home },
     { to: "/services", label: "Book a Worker", icon: CalendarClock },
     { to: "/dashboard", label: "Worker Portal", icon: HardHat },
-    { to: "/admin", label: "Admin", icon: ShieldCheck },
+    ...(amAdmin
+      ? [{ to: "/admin", label: "Admin", icon: ShieldCheck }]
+      : []),
   ];
 
   return (

@@ -1,6 +1,6 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { query, mutation, QueryCtx } from "./_generated/server";
-import { Id } from "./_generated/dataModel";
+import { Doc, Id } from "./_generated/dataModel";
 import { v } from "convex/values";
 
 /* ── Server-side service pricing (kept free of client/UI imports) ── */
@@ -40,7 +40,15 @@ const SERVICE_PRICES: Record<string, ServicePrice> = {
   "ap-mw": { trade: "appliance", name: "Microwave & oven fix", base: 299, hourly: 350, urgent: false },
 };
 
-const WELFARE_RATE = 0.03;
+/* ── Cooperative revenue distribution ──
+ * Every booking amount splits three ways:
+ *   90% → worker payout (direct UPI settlement to the artisan)
+ *    7% → worker welfare fund (pension, insurance, family support)
+ *    3% → operational costs (dispatch, telemetry, verification board)
+ */
+export const WORKER_SHARE_RATE = 0.9;
+export const WELFARE_RATE = 0.07;
+export const OPS_RATE = 0.03;
 const NEXT_STATUS: Record<string, string> = {
   accepted: "enroute",
   enroute: "inprogress",
@@ -74,7 +82,11 @@ async function isAdminUser(
   return user.role === "admin";
 }
 
-async function canSeeBooking(ctx: QueryCtx, userId: Id<"users">, b: any) {
+async function canSeeBooking(
+  ctx: QueryCtx,
+  userId: Id<"users">,
+  b: Doc<"bookings"> | null,
+) {
   if (!b) return false;
   if (b.customerId === userId) return true;
   if (b.workerUserId === userId) return true;
@@ -99,9 +111,10 @@ export const create = mutation({
     const svc = SERVICE_PRICES[args.serviceId];
     if (!svc) throw new Error("Unknown service");
     if (!args.address.trim()) throw new Error("Address is required");
-    const welfareAmt = args.welfareOptIn
-      ? Math.round(svc.base * WELFARE_RATE)
-      : 0;
+    // Cooperative split applied on the gross amount — always, not opt-in.
+    const workerShare = Math.round(svc.base * WORKER_SHARE_RATE);
+    const welfareAmt = Math.round(svc.base * WELFARE_RATE);
+    const opsAmt = svc.base - workerShare - welfareAmt; // exactly 3%, no rounding drift
     const bookingId = await ctx.db.insert("bookings", {
       customerId: userId,
       serviceId: args.serviceId,
@@ -117,7 +130,9 @@ export const create = mutation({
       base: svc.base,
       hourly: svc.hourly,
       welfareAmt,
-      total: svc.base + welfareAmt,
+      opsAmt,
+      workerShare,
+      total: svc.base,
       status: "pending",
       createdAt: Date.now(),
     });
@@ -278,12 +293,12 @@ export const confirmUtr = mutation({
       paidAt: Date.now(),
       status: "completed",
     });
-    // 3% welfare opt-in accrues to the cooperative pool ledger
+    // 7% welfare share accrues to the artisan's cooperative welfare ledger
     if (b.welfareAmt > 0 && b.workerId) {
       const w = await ctx.db.get(b.workerId);
       if (w) {
         await ctx.db.patch(w._id, {
-          welfareBalance: (w.welfareBalance ?? 0) + Math.round(b.welfareAmt / 3),
+          welfareBalance: (w.welfareBalance ?? 0) + b.welfareAmt,
         });
       }
     }

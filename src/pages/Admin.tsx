@@ -120,6 +120,8 @@ function OverviewPanel({
     bookings: number;
     revenueSettled: number;
     welfarePool: number;
+    workerPayouts?: number;
+    opsPool?: number;
     byStatus: Record<string, number>;
     byTrade: Record<string, number>;
   };
@@ -139,6 +141,39 @@ function OverviewPanel({
         <StatTile icon={<Wallet className="size-3.5" />} label={t("ad_settled")} value={`₹${overview.revenueSettled.toLocaleString("en-IN")}`} />
         <StatTile icon={<HeartPulse className="size-3.5" />} label={t("ad_welfare")} value={`₹${overview.welfarePool.toLocaleString("en-IN")}`} tone="orange" />
       </div>
+
+      {/* Cooperative revenue distribution — 90 / 7 / 3 */}
+      <Panel title="Revenue distribution · 90 / 7 / 3" className="mt-5" bodyClassName="p-4">
+        <div className="grid grid-cols-3 gap-3">
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-3 text-center">
+            <p className="text-lg font-black text-emerald-800">
+              ₹{(overview.workerPayouts ?? 0).toLocaleString("en-IN")}
+            </p>
+            <p className="text-[10px] font-bold text-emerald-700 uppercase tracking-wide">
+              Worker payouts · 90%
+            </p>
+          </div>
+          <div className="rounded-xl border border-orange-200 bg-orange-50 px-3 py-3 text-center">
+            <p className="text-lg font-black text-orange-800">
+              ₹{overview.welfarePool.toLocaleString("en-IN")}
+            </p>
+            <p className="text-[10px] font-bold text-orange-700 uppercase tracking-wide">
+              Welfare fund · 7%
+            </p>
+          </div>
+          <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-center">
+            <p className="text-lg font-black text-slate-800">
+              ₹{(overview.opsPool ?? 0).toLocaleString("en-IN")}
+            </p>
+            <p className="text-[10px] font-bold text-slate-600 uppercase tracking-wide">
+              Operations · 3%
+            </p>
+          </div>
+        </div>
+        <p className="mt-2 text-[11px] text-slate-500">
+          Settled revenue ₹{overview.revenueSettled.toLocaleString("en-IN")} · workers receive 90% directly via UPI, 7% accrues to the cooperative welfare pool, 3% covers dispatch and verification costs.
+        </p>
+      </Panel>
 
       <div className="mt-5 grid gap-5 lg:grid-cols-5">
         <Panel title={t("ad_pipeline")} className="lg:col-span-2" bodyClassName="p-4">

@@ -1,7 +1,9 @@
 import { Link, useNavigate } from "react-router";
+import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { LanguagePicker } from "@/components/terminal";
 import { useDetectedLocation, formatCoords, formatAccuracy } from "@/lib/useLocation";
+import LocationPickerModal from "@/components/map/LocationPickerModal";
 import { motion } from "framer-motion";
 import {
   ArrowRight,
@@ -33,7 +35,8 @@ export function SahMark({ size = "lg" }: { size?: "sm" | "md" | "lg" }) {
 export default function Landing() {
   const { isAuthenticated, isLoading } = useAuth();
   const navigate = useNavigate();
-  const { location, detect } = useDetectedLocation();
+  const { location, detect, setManual } = useDetectedLocation();
+  const [showMap, setShowMap] = useState(false);
 
   return (
     <div className="flex min-h-screen flex-col bg-gradient-to-b from-slate-50 via-emerald-50/30 to-slate-100 font-sans text-slate-900 antialiased">
@@ -96,7 +99,7 @@ export default function Landing() {
               </button>
               <button
                 type="button"
-                onClick={() => navigate("/services")}
+                onClick={() => setShowMap(true)}
                 className="rounded-full border border-emerald-200 bg-emerald-50 px-3.5 py-1.5 text-[11px] font-bold text-emerald-700 transition hover:bg-emerald-100 active:scale-95"
               >
                 ✎ Change
@@ -195,6 +198,22 @@ export default function Landing() {
           </span>
         </div>
       </footer>
+
+      {/* Exact-location picker for the detected address */}
+      <LocationPickerModal
+        open={showMap}
+        initialLat={location.lat}
+        initialLng={location.lng}
+        onClose={() => setShowMap(false)}
+        onConfirm={(loc) => {
+          setManual({
+            label: loc.address || location.label,
+            lat: loc.lat,
+            lng: loc.lng,
+          });
+          setShowMap(false);
+        }}
+      />
     </div>
   );
 }

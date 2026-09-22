@@ -411,7 +411,7 @@ export default function BookingDetail() {
               </Panel>
             )}
 
-            {/* Bill summary */}
+            {/* Bill summary with cooperative split */}
             <Panel title={t("bk_summary")} bodyClassName="p-4">
               <div className="space-y-1.5 text-sm">
                 <div className="flex justify-between">
@@ -421,9 +421,21 @@ export default function BookingDetail() {
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-500">{t("bk_welfare_row")}</span>
+                  <span className="text-slate-500">Worker receives (90%)</span>
+                  <span className="font-semibold text-emerald-800">
+                    ₹{booking.workerShare ?? Math.round(booking.base * 0.9)}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Welfare fund (7%)</span>
                   <span className="font-semibold text-orange-800">
-                    {booking.welfareAmt > 0 ? `₹${booking.welfareAmt}` : "—"}
+                    ₹{booking.welfareAmt}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Operations (3%)</span>
+                  <span className="font-semibold text-slate-900">
+                    ₹{booking.opsAmt ?? (booking.base - booking.welfareAmt - (booking.workerShare ?? Math.round(booking.base * 0.9)))}
                   </span>
                 </div>
                 <div className="flex justify-between border-t border-dashed border-slate-200 pt-2">

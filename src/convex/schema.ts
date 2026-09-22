@@ -1,6 +1,6 @@
 import { authTables } from "@convex-dev/auth/server";
 import { defineSchema, defineTable } from "convex/server";
-import { Infer, v } from "convex/values";
+import { v } from "convex/values";
 
 // default user roles. can add / remove based on the project as needed
 export const ROLES = {
@@ -93,7 +93,9 @@ const schema = defineSchema(
       welfareOptIn: v.boolean(),
       base: v.number(),
       hourly: v.number(),
-      welfareAmt: v.number(), // 3% of base when opted in
+      welfareAmt: v.number(), // 7% welfare share (ledger)
+      opsAmt: v.number(), // 3% operational cost share (ledger)
+      workerShare: v.number(), // 90% worker payout
       total: v.number(),
       status: v.string(), // pending|accepted|enroute|inprogress|payment|completed|settled|cancelled
       workerId: v.optional(v.id("artisans")), // assigned on accept
