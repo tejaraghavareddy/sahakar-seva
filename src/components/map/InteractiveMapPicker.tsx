@@ -115,6 +115,7 @@ export default function InteractiveMapPicker({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (initialLat && initialLng) void reverse(initialLat, initialLng);
+    else handleGps(); // auto-detect on open so the pin lands on the user
   }, []);
 
   // GPS button

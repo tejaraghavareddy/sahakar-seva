@@ -36,7 +36,7 @@ export default function LocationPickerModal({
                 Pick service location
               </h2>
               <p className="text-[11px] text-slate-500">
-                Drag the pin or use GPS to set your exact address
+                Detecting your GPS position… drag the pin to adjust, or search a landmark
               </p>
             </div>
           </div>

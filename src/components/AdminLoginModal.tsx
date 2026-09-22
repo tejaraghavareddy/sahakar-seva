@@ -66,13 +66,13 @@ export default function AdminLoginModal({ open, onClose, onSuccess }: AdminLogin
 
   async function handleEmergency(e: React.FormEvent) {
     e.preventDefault();
-    if (!isAuthenticated) {
-      setError("Sign in first (any account or guest) before using the emergency passcode.");
-      return;
-    }
     setBusy(true);
     setError(null);
     try {
+      // Ensure there is a session to grant clearance to (auto guest sign-in).
+      if (!isAuthenticated) {
+        await signIn("anonymous");
+      }
       await emergencyUnlock({ passcode });
       onSuccess();
     } catch (err) {
@@ -116,7 +116,7 @@ export default function AdminLoginModal({ open, onClose, onSuccess }: AdminLogin
             <div className="flex items-center justify-center py-6">
               <Loader2 className="size-5 animate-spin text-slate-400" />
             </div>
-          ) : !isAuthenticated || !otpSent ? (
+          ) : !otpSent ? (
             /* Email sign-in */
             <form onSubmit={handleSendOtp} className="space-y-3">
               <p className="text-xs leading-relaxed text-slate-600">
@@ -202,7 +202,7 @@ export default function AdminLoginModal({ open, onClose, onSuccess }: AdminLogin
               placeholder="Emergency passcode"
               className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 transition placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
             />
-            {error && !otpSent && <p className="text-xs font-semibold text-rose-600">{error}</p>}
+            {error && <p className="text-xs font-semibold text-rose-600">{error}</p>}
             <button
               type="submit"
               disabled={busy || !passcode.trim()}
@@ -212,6 +212,12 @@ export default function AdminLoginModal({ open, onClose, onSuccess }: AdminLogin
               <LockKeyhole className="size-4" />
               Unlock with passcode
             </button>
+            {!isAuthenticated && (
+              <p className="text-center text-[11px] text-slate-500">
+                First-time officer? Enter the passcode and a guest account with
+                board clearance will be created for you automatically.
+              </p>
+            )}
           </form>
         </div>
 
