@@ -222,6 +222,13 @@ export default function AdminLoginModal({ open, onClose, onSuccess }: AdminLogin
         </div>
 
         <div className="rounded-b-3xl border-t border-slate-200 bg-slate-50 px-5 py-3">
+          <div className="mb-2 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2">
+            <p className="text-center text-[11px] font-bold text-amber-800">
+              ⚠️ Demo access only — demo.admin@sahakar.demo / passcode
+              SAHAKAR-BOARD-2026 is a demo account and can be removed at any
+              time.
+            </p>
+          </div>
           <p className="text-center text-[10px] text-slate-400">
             All clearance attempts are logged in the federation audit ledger ·
             5 wrong passcodes lock access for 10 minutes · guest sessions

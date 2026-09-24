@@ -82,6 +82,13 @@ export default function Admin() {
           {t("ad_title")}
         </h1>
         <p className="mt-1 text-sm text-slate-600">{t("ad_sub")}</p>
+        <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-amber-300 bg-amber-50 px-3 py-1.5">
+          <ShieldAlert className="size-3.5 text-amber-700" />
+          <span className="text-[11px] font-bold text-amber-800">
+            Demo admin session — this console is running on a demo account and
+            can be removed at any time
+          </span>
+        </div>
 
         {/* Tab bar */}
         <div className="mt-5 flex gap-1 overflow-x-auto rounded-2xl border border-slate-200 bg-white p-1 shadow-xs">

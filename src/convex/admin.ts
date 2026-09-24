@@ -3,6 +3,12 @@ import { query, mutation, QueryCtx, MutationCtx } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
 import { v } from "convex/values";
 
+/**
+ * DEMO ADMIN — this account exists only for demo/testing purposes and can be
+ * removed at any time by deleting the DEMO_ADMIN_EMAILS entry below.
+ */
+export const DEMO_ADMIN_EMAILS = ["demo.admin@sahakar.demo"];
+
 async function requireUser(ctx: QueryCtx) {
   const userId = await getAuthUserId(ctx);
   if (userId === null) throw new Error("Not authenticated");
@@ -16,6 +22,8 @@ async function isAdminUser(
   const user = await ctx.db.get(userId);
   if (!user) return false;
   if (user.email === "teja200822@gmail.com") return true;
+  // Demo admin (removable — see DEMO_ADMIN_EMAILS above)
+  if (DEMO_ADMIN_EMAILS.includes(user.email ?? "")) return true;
   return user.role === "admin";
 }
 
