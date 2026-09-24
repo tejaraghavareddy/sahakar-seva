@@ -61,6 +61,10 @@ const FORECAST_SCHEMA = {
       items: { type: "string" },
       description: "3 concise tactical recommendations for society branch managers",
     },
+    topTrade: { type: "string", description: "The single trade forecasted to have the highest demand" },
+    topTradeReason: { type: "string", description: "One-sentence reason why that trade will see high demand (weather, festival, season, historical trend)" },
+    fairRatePerHour: { type: "number", description: "Recommended cooperative fair rate in INR per hour ensuring livable wage" },
+    confidence: { type: "number", description: "AI confidence level 0-100 based on data volume and trend consistency" },
     summary: { type: "string", description: "One-paragraph executive summary for the federation dashboard" },
   },
   required: [
@@ -69,6 +73,10 @@ const FORECAST_SCHEMA = {
     "priceRecommendation",
     "welfarePoolAllocation",
     "actionableAdvisories",
+    "topTrade",
+    "topTradeReason",
+    "fairRatePerHour",
+    "confidence",
     "summary",
   ],
 };
@@ -95,6 +103,10 @@ const STABILIZATION_SCHEMA = {
       items: { type: "string" },
       description: "3 concise stabilization recommendations for society managers",
     },
+    topTrade: { type: "string", description: "Trade with highest price volatility or demand risk" },
+    topTradeReason: { type: "string", description: "One-sentence reason for that trade's volatility or demand risk" },
+    fairRatePerHour: { type: "number", description: "Stabilized cooperative fair rate in INR per hour" },
+    confidence: { type: "number", description: "AI confidence level 0-100" },
     summary: { type: "string", description: "Stabilization executive summary" },
   },
   required: [
@@ -103,6 +115,10 @@ const STABILIZATION_SCHEMA = {
     "priceRecommendation",
     "welfarePoolAllocation",
     "actionableAdvisories",
+    "topTrade",
+    "topTradeReason",
+    "fairRatePerHour",
+    "confidence",
     "summary",
   ],
 };
@@ -153,6 +169,24 @@ function heuristicForecast(
             : "No critical shortages detected."
         } Seasonal outlook: ${getSeasonalContext().split(".")[0]}.`;
 
+  // Top-demand trade: highest unserviced-to-artisan ratio (fallback: most booked 24h).
+  let topTrade = deficitTrades[0];
+  let topRatio = -1;
+  for (const [trade, data] of Object.entries(perTrade)) {
+    const ratio = data.unserviced / Math.max(data.artisans, 1) + data.booked24h * 0.01;
+    if (ratio > topRatio) {
+      topRatio = ratio;
+      topTrade = trade;
+    }
+  }
+  const seasonalLine = getSeasonalContext().split(".")[0];
+  const fairRatePerHour = Math.round(90 + demandIndex * 1.6); // ₹/hr, scales with demand pressure
+  const dataPoints = Object.values(perTrade).reduce(
+    (n, d) => n + d.booked24h + d.unserviced,
+    0,
+  );
+  const confidence = Math.max(45, Math.min(95, 50 + Math.round(Math.sqrt(dataPoints) * 6)));
+
   return {
     demandIndex,
     primaryDeficitTrades: deficitTrades,
@@ -162,6 +196,10 @@ function heuristicForecast(
         : `Maintain union base rates ₹750–900/day depending on trade complexity.`,
     welfarePoolAllocation: welfareAlloc,
     actionableAdvisories: advisories,
+    topTrade: topTrade ?? "electrician",
+    topTradeReason: `${seasonalLine}${topTrade ? ` — elevated demand expected in ${topTrade} services` : ""}.`,
+    fairRatePerHour,
+    confidence,
     summary,
   };
 }
@@ -193,7 +231,11 @@ Generate a structured JSON response with:
 3. "priceRecommendation": fair-pricing stabilization recommendation — set floor wages that ensure living wages plus surge caps to prevent gouging during emergency dispatches
 4. "welfarePoolAllocation": recommended welfare reserve percentage for the stabilization fund (5-15%)
 5. "actionableAdvisories": 3 concise stabilization recommendations for society branch managers
-6. "summary": one-paragraph executive summary for the federation dashboard`
+6. "topTrade": the trade with the highest volatility or demand risk
+7. "topTradeReason": one-sentence reason for that trade's risk (weather, festival, season, historical trend)
+8. "fairRatePerHour": stabilized cooperative fair rate in INR per hour
+9. "confidence": your confidence level 0-100 given the data volume
+10. "summary": one-paragraph executive summary for the federation dashboard`
     : `You are the Chief Labor Economist for the Sahakar Seva Cooperative Worker Federation.
 
 Analyze the following district operational telemetry and generate a demand forecast:
@@ -216,7 +258,11 @@ Generate a structured JSON response with:
 3. "priceRecommendation": fair wage floor recommendation in INR per day — prevent customer gouging while ensuring living wages for artisans
 4. "welfarePoolAllocation": suggested welfare reserve allocation percentage (5-15%)
 5. "actionableAdvisories": 3 concise tactical recommendations for society branch managers
-6. "summary": one-paragraph executive summary for the federation dashboard`;
+6. "topTrade": the single trade forecasted to have the highest demand
+7. "topTradeReason": one-sentence reason why that trade will see high demand (weather, festival, season, historical trend)
+8. "fairRatePerHour": recommended cooperative fair rate in INR per hour ensuring livable wage
+9. "confidence": your confidence level 0-100 given the data volume
+10. "summary": one-paragraph executive summary for the federation dashboard`;
 }
 
 export const runForecast = action({
@@ -276,6 +322,12 @@ export const runForecast = action({
     result.welfarePoolAllocation = Math.max(5, Math.min(15, Math.round(result.welfarePoolAllocation)));
     if (!Array.isArray(result.primaryDeficitTrades)) result.primaryDeficitTrades = [];
     if (!Array.isArray(result.actionableAdvisories)) result.actionableAdvisories = [];
+    if (typeof result.fairRatePerHour !== "number" || !Number.isFinite(result.fairRatePerHour)) {
+      result.fairRatePerHour = 120; // sane fallback — never render NaN
+    }
+    if (typeof result.confidence !== "number" || !Number.isFinite(result.confidence)) {
+      result.confidence = 70; // sane fallback — never render NaN
+    }
 
     // Persist the snapshot
     const id = await ctx.runMutation(api.forecasts.save, {
@@ -287,6 +339,10 @@ export const runForecast = action({
       welfarePoolAllocation: result.welfarePoolAllocation,
       advisories: result.actionableAdvisories,
       summary: result.summary ? String(result.summary) : undefined,
+      topTrade: result.topTrade ? String(result.topTrade) : undefined,
+      topTradeReason: result.topTradeReason ? String(result.topTradeReason) : undefined,
+      fairRatePerHour: typeof result.fairRatePerHour === "number" && Number.isFinite(result.fairRatePerHour) ? Math.round(result.fairRatePerHour) : undefined,
+      confidence: typeof result.confidence === "number" && Number.isFinite(result.confidence) ? Math.max(0, Math.min(100, Math.round(result.confidence))) : undefined,
       source,
       model: source === "gemini" ? modelId : undefined,
       context: JSON.stringify(context),

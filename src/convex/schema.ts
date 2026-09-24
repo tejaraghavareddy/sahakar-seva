@@ -148,6 +148,10 @@ const schema = defineSchema(
       source: v.string(), // "gemini" | "heuristic"
       model: v.optional(v.string()),
       context: v.optional(v.string()), // telemetry snapshot fed to the model
+      topTrade: v.optional(v.string()), // forecasted high-demand trade
+      topTradeReason: v.optional(v.string()),
+      fairRatePerHour: v.optional(v.number()),
+      confidence: v.optional(v.number()), // AI confidence 0-100
       createdBy: v.id("users"),
       createdAt: v.number(),
     })
