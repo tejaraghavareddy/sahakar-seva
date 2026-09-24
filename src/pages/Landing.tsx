@@ -8,11 +8,14 @@ import AdminLoginModal from "@/components/AdminLoginModal";
 import { motion } from "framer-motion";
 import {
   ArrowRight,
+  BadgeCheck,
   CalendarClock,
   HardHat,
+  HeartPulse,
   MapPin,
   RefreshCcw,
   ShieldCheck,
+  HandCoins,
 } from "lucide-react";
 
 /* ── Brand mark: rounded emerald tile with the सह glyph ─────── */
@@ -192,6 +195,55 @@ export default function Landing() {
 
         </motion.div>
       </main>
+
+      {/* ── Cooperative revenue engine band ─────────────────── */}
+      <section aria-label="Cooperative revenue engine" className="border-t border-slate-200 bg-white">
+        <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
+          <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
+            <div className="flex items-center gap-3 text-left">
+              <SahMark size="md" />
+              <div>
+                <p className="text-sm font-black leading-tight tracking-tight text-slate-900">
+                  Sahakar Seva Cooperative
+                </p>
+                <p className="text-sm font-black leading-tight tracking-tight text-slate-900">
+                  Digital Marketplace
+                </p>
+              </div>
+            </div>
+            <p className="text-xs italic text-slate-400">
+              Registered under Maharashtra Cooperative Societies Act · Connected live ledger
+            </p>
+          </div>
+          <div className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-3">
+            {/* Welfare share — federation's top preference, listed first */}
+            <div className="flex items-start gap-2.5">
+              <HeartPulse className="mt-0.5 size-5 shrink-0 text-emerald-600" />
+              <div>
+                <p className="flex items-center gap-1.5 text-lg font-black leading-tight text-emerald-700">
+                  7% Dedicated Welfare Pool
+                  <BadgeCheck className="size-4 text-emerald-600" aria-label="Top priority" />
+                </p>
+                <p className="mt-0.5 text-[11px] font-semibold uppercase tracking-wide text-emerald-600">
+                  Top priority — funded before any ops spend
+                </p>
+              </div>
+            </div>
+            <div className="flex items-start gap-2.5">
+              <HandCoins className="mt-0.5 size-5 shrink-0 text-emerald-600" />
+              <p className="text-lg font-black leading-tight text-emerald-700">
+                90% Direct Worker Payout
+              </p>
+            </div>
+            <div className="flex items-start gap-2.5">
+              <ShieldCheck className="mt-0.5 size-5 shrink-0 text-slate-400" />
+              <p className="text-lg font-black leading-tight text-slate-500">
+                3% Federation Ops
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
 
       {/* ── Footer strip ─────────────────────────────────────── */}
       <footer className="border-t border-slate-200 bg-white">

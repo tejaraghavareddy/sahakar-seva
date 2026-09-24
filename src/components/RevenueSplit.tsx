@@ -1,4 +1,4 @@
-import { HandCoins, HeartPulse, Wrench } from "lucide-react";
+import { BadgeCheck, HandCoins, HeartPulse, Wrench } from "lucide-react";
 
 /**
  * Cooperative revenue split visualization — 90% worker / 7% welfare / 3% ops.
@@ -22,22 +22,25 @@ export function RevenueSplitBar({
   const welfarePct = (welfareAmt / denom) * 100;
   const opsPct = (opsAmt / denom) * 100;
 
+  // Welfare listed first — the federation's top-preference share.
   const rows = [
+    {
+      // Welfare is the federation's top-priority share — highlighted first.
+      icon: <HeartPulse className="size-3.5" />,
+      label: "Welfare fund",
+      pct: "7%",
+      amt: welfareAmt,
+      dot: "bg-emerald-500",
+      text: "text-emerald-800",
+      priority: true,
+    },
     {
       icon: <HandCoins className="size-3.5" />,
       label: "Worker payout",
       pct: "90%",
       amt: workerShare,
-      dot: "bg-emerald-600",
-      text: "text-emerald-800",
-    },
-    {
-      icon: <HeartPulse className="size-3.5" />,
-      label: "Welfare fund",
-      pct: "7%",
-      amt: welfareAmt,
-      dot: "bg-orange-500",
-      text: "text-orange-800",
+      dot: "bg-slate-900",
+      text: "text-slate-800",
     },
     {
       icon: <Wrench className="size-3.5" />,
@@ -58,9 +61,9 @@ export function RevenueSplitBar({
           title={`Worker payout 90% · ₹${workerShare}`}
         />
         <div
-          className="h-full bg-orange-500 transition-all"
+          className="h-full bg-emerald-500 transition-all"
           style={{ width: `${welfarePct}%` }}
-          title={`Welfare fund 7% · ₹${welfareAmt}`}
+          title={`Welfare fund 7% — top priority · ₹${welfareAmt}`}
         />
         <div
           className="h-full bg-slate-700 transition-all"
@@ -76,6 +79,9 @@ export function RevenueSplitBar({
               <p className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-slate-500">
                 {r.icon}
                 <span className="truncate">{r.label}</span>
+                {"priority" in r && r.priority && (
+                  <BadgeCheck className="size-3 shrink-0 text-emerald-600" aria-label="Top priority" />
+                )}
               </p>
               {!compact && (
                 <p className={`text-xs font-extrabold ${r.text}`}>
