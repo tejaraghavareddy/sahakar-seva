@@ -1,6 +1,6 @@
 import { Link, useNavigate } from "react-router";
 import { useState } from "react";
-import { useAuth } from "@/hooks/use-auth";
+import { useLang } from "@/lib/i18n";
 import { LanguagePicker } from "@/components/terminal";
 import { useDetectedLocation, formatCoords, formatAccuracy } from "@/lib/useLocation";
 import LocationPickerModal from "@/components/map/LocationPickerModal";
@@ -35,7 +35,7 @@ export function SahMark({ size = "lg" }: { size?: "sm" | "md" | "lg" }) {
 }
 
 export default function Landing() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { t } = useLang();
   const navigate = useNavigate();
   const { location, detect, setManual } = useDetectedLocation();
   const [showMap, setShowMap] = useState(false);
@@ -70,8 +70,7 @@ export default function Landing() {
             Sahakar Seva
           </h1>
           <p className="mt-2 text-sm font-medium text-slate-500 italic sm:text-base">
-            Cooperative Digital Service Marketplace · Skilled Artisans &amp;
-            Booking
+            {t("ld_tagline")}
           </p>
 
           {/* ── Detected location bar ────────────────────────── */}
@@ -80,7 +79,7 @@ export default function Landing() {
               <span className="mt-1.5 size-2 shrink-0 animate-pulse rounded-full bg-emerald-500" />
               <div className="min-w-0">
                 <p className="truncate text-xs text-slate-800">
-                  <span className="font-bold">Your Location:</span>{" "}
+                  <span className="font-bold">{t("ld_your_location")}</span>{" "}
                   <span className="italic">{location.label}</span>
                 </p>
                 <p className="mt-0.5 text-[10px] text-slate-400">
@@ -105,17 +104,17 @@ export default function Landing() {
                 onClick={() => setShowMap(true)}
                 className="rounded-full border border-emerald-200 bg-emerald-50 px-3.5 py-1.5 text-[11px] font-bold text-emerald-700 transition hover:bg-emerald-100 active:scale-95"
               >
-                ✎ Change
+                ✎ {t("ld_change")}
               </button>
             </div>
           </div>
 
           {/* ── Role selection heading ───────────────────────── */}
           <h2 className="mt-10 text-xl font-black tracking-tight text-slate-900 sm:text-2xl">
-            Choose your gateway
+            {t("ld_choose")}
           </h2>
           <p className="mt-1.5 text-xs text-slate-500 italic sm:text-sm">
-            Booker, Artisan, or Federation Admin — three portals, one cooperative
+            {t("ld_choose_sub")}
           </p>
 
           {/* ── Two gateway cards ────────────────────────────── */}
@@ -128,17 +127,16 @@ export default function Landing() {
                 <ArrowRight className="size-5 text-slate-300 transition group-hover:translate-x-1 group-hover:text-emerald-600" />
               </div>
               <span className="mt-5 w-fit rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] font-semibold text-emerald-800">
-                Booking Person / Customer
+                {t("ld_cust_badge")}
               </span>
               <h3 className="mt-2.5 text-2xl font-black tracking-tight text-slate-900">
-                I Need a Worker
+                {t("ld_cust_title")}
               </h3>
               <p className="mt-2 text-sm leading-relaxed text-slate-500 italic">
-                Find and book verified electricians, plumbers, carpenters, and
-                appliance service technicians nearest to your location.
+                {t("ld_cust_desc")}
               </p>
               <span className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3.5 text-sm font-bold text-white shadow-md transition hover:bg-emerald-700 group-active:scale-[0.98]">
-                Book a Skilled Worker Now →
+                {t("ld_cust_cta")}
               </span>
             </GatewayCard>
 
@@ -150,17 +148,16 @@ export default function Landing() {
                 <ArrowRight className="size-5 text-slate-300 transition group-hover:translate-x-1 group-hover:text-teal-600" />
               </div>
               <span className="mt-5 w-fit rounded-full border border-teal-200 bg-teal-50 px-3 py-1 text-[11px] font-semibold text-teal-800">
-                Service Worker / Artisan
+                {t("ld_work_badge")}
               </span>
               <h3 className="mt-2.5 text-2xl font-black tracking-tight text-slate-900">
-                I am a Worker
+                {t("ld_work_title")}
               </h3>
               <p className="mt-2 text-sm leading-relaxed text-slate-500 italic">
-                Sign in or register with the federation, complete trade
-                credential verification, and receive local service requests.
+                {t("ld_work_desc")}
               </p>
               <span className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-teal-900 px-4 py-3.5 text-sm font-bold text-white shadow-md transition hover:bg-teal-800 group-active:scale-[0.98]">
-                Worker Portal (Sign In &amp; Verify) →
+                {t("ld_work_cta")}
               </span>
             </GatewayCard>
 
@@ -172,14 +169,13 @@ export default function Landing() {
                 <ArrowRight className="size-5 text-slate-300 transition group-hover:translate-x-1 group-hover:text-slate-600" />
               </div>
               <span className="mt-5 w-fit rounded-full border border-slate-300 bg-slate-100 px-3 py-1 text-[11px] font-semibold text-slate-700">
-                Federation Admin
+                {t("ld_admin_badge")}
               </span>
               <h3 className="mt-2.5 text-2xl font-black tracking-tight text-slate-900">
-                Governance Board
+                {t("ld_admin_title")}
               </h3>
               <p className="mt-2 text-sm leading-relaxed text-slate-500 italic">
-                Officer clearance required. Oversee verification, GIS dispatch,
-                welfare funds, and district societies.
+                {t("ld_admin_desc")}
               </p>
               <button
                 type="button"
@@ -189,22 +185,11 @@ export default function Landing() {
                 }}
                 className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-3.5 text-sm font-bold text-white shadow-md transition hover:bg-slate-800 group-active:scale-[0.98]"
               >
-                Secure Officer Sign-In →
+                {t("ld_admin_cta")}
               </button>
             </GatewayCard>
           </div>
 
-          {/* ── Admin text link removed — replaced by gateway card ── */}
-
-          {!isLoading && isAuthenticated && (
-            <button
-              type="button"
-              onClick={() => navigate("/dashboard")}
-              className="mt-6 rounded-full border border-emerald-200 bg-white px-4 py-2 text-xs font-bold text-emerald-700 shadow-xs transition hover:bg-emerald-50 active:scale-95"
-            >
-              Go to my dashboard →
-            </button>
-          )}
         </motion.div>
       </main>
 
@@ -214,14 +199,9 @@ export default function Landing() {
           <div className="flex items-center gap-2">
             <SahMark size="sm" />
             <span className="font-bold text-slate-800">Sahakar Seva</span>
-            <span className="italic">
-              · Cooperative Digital Service Marketplace · Skilled Artisans &amp;
-              Booking
-            </span>
+            <span className="italic">· {t("ld_tagline")}</span>
           </div>
-          <span className="italic">
-            Official Cooperative Registry · Verified Skilled Artisans
-          </span>
+          <span className="italic">{t("ld_footer_reg")}</span>
         </div>
       </footer>
 
