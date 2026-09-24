@@ -28,6 +28,7 @@ import { useAuth } from "@/hooks/use-auth";
 
 const Landing = lazy(() => import("./pages/Landing.tsx"));
 const AuthPage = lazy(() => import("./pages/Auth.tsx"));
+const CustomerAuthPage = lazy(() => import("./pages/CustomerAuth.tsx"));
 const Dashboard = lazy(() => import("./pages/Dashboard.tsx"));
 const Onboarding = lazy(() => import("./pages/Onboarding.tsx"));
 const Services = lazy(() => import("./pages/Services.tsx"));
@@ -256,6 +257,10 @@ export default function App() {
             <Route
               path="/auth"
               element={<AuthPage redirectAfterAuth="/dashboard" />}
+            />
+            <Route
+              path="/login/customer"
+              element={<CustomerAuthPage />}
             />
 
             {/* Customer portal — browse, book, pay, track */}
