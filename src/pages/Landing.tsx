@@ -250,8 +250,7 @@ export default function Landing() {
         <div className="mx-auto flex w-full max-w-6xl flex-col items-center justify-between gap-2 px-4 py-4 text-[11px] text-slate-500 sm:flex-row">
           <div className="flex items-center gap-2">
             <SahMark size="sm" />
-            <span className="font-bold text-slate-800">Sahakar Seva</span>
-            <span className="italic">· {t("ld_tagline")}</span>
+            <span className="italic">{t("ld_tagline")}</span>
           </div>
           <span className="italic">{t("ld_footer_reg")}</span>
         </div>
