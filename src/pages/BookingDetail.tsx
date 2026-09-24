@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import CustomerRealtimeRadarMap from "@/components/map/CustomerRealtimeRadarMap";
+import { RevenueSplitBar } from "@/components/RevenueSplit";
 
 const FLOW = [
   "pending",
@@ -469,6 +470,15 @@ export default function BookingDetail() {
                     ₹{booking.total}
                   </span>
                 </div>
+              </div>
+              <div className="mt-4 border-t border-slate-200 pt-3">
+                <p className="tl-label mb-2">Cooperative split</p>
+                <RevenueSplitBar
+                  total={booking.total}
+                  workerShare={booking.workerShare ?? Math.round(booking.base * 0.9)}
+                  welfareAmt={booking.welfareAmt}
+                  opsAmt={booking.opsAmt ?? booking.base - booking.welfareAmt - (booking.workerShare ?? Math.round(booking.base * 0.9))}
+                />
               </div>
             </Panel>
 

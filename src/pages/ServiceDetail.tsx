@@ -5,6 +5,7 @@ import { useLang } from "@/lib/i18n";
 import { getService, getTrade, COLOR_SOFT } from "@/lib/trades";
 import { AppHeader } from "@/components/AppHeader";
 import { Panel, SectionHeader, TlButton, StatusDot } from "@/components/terminal";
+import { RevenueSplitBar } from "@/components/RevenueSplit";
 import {
   ArrowLeft,
   ArrowRight,
@@ -128,6 +129,19 @@ export default function ServiceDetail() {
               <div className="mt-4 flex items-center gap-2 rounded-xl border border-teal-200 bg-teal-50 px-3 py-2.5 text-xs font-bold text-teal-800">
                 <StatusDot tone="ok" blink />
                 {workersForTrade} {t("dt_workers")}
+              </div>
+
+              <div className="mt-4 border-t border-slate-200 pt-3">
+                <RevenueSplitBar
+                  compact
+                  total={svc.base}
+                  workerShare={Math.round(svc.base * 0.9)}
+                  welfareAmt={Math.round(svc.base * 0.07)}
+                  opsAmt={svc.base - Math.round(svc.base * 0.9) - Math.round(svc.base * 0.07)}
+                />
+                <p className="mt-1.5 text-[10px] font-semibold text-slate-400">
+                  0% platform commission — workers keep 90%
+                </p>
               </div>
 
               <TlButton

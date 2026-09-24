@@ -16,6 +16,7 @@ import {
   MapPinned,
 } from "lucide-react";
 import LocationPickerModal from "@/components/map/LocationPickerModal";
+import { RevenueSplitBar } from "@/components/RevenueSplit";
 
 const SLOTS = [
   "09:00",
@@ -337,7 +338,15 @@ export default function Book() {
                 <span className="font-bold text-slate-900">₹{total}</span>
               </div>
             </div>
-            <p className="mt-2 text-[11px] text-slate-400">{t("bd_upi_note")}</p>
+              <div className="mt-3 border-t border-slate-200 pt-3">
+                <RevenueSplitBar
+                  total={total}
+                  workerShare={workerShare}
+                  welfareAmt={welfareAmt}
+                  opsAmt={opsAmt}
+                />
+              </div>
+              <p className="mt-2 text-[11px] text-slate-400">{t("bd_upi_note")}</p>
 
             {error && (
               <p className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700">

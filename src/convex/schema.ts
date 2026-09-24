@@ -164,6 +164,27 @@ const schema = defineSchema(
       at: v.number(),
     }).index("by_booking", ["bookingId"]),
 
+    // Admin security — audit ledger of all clearance attempts & privileged actions
+    adminAuditLog: defineTable({
+      actorId: v.optional(v.id("users")), // null when unauthenticated
+      email: v.optional(v.string()), // claimed email at attempt time
+      kind: v.string(), // "clearance_attempt" | "clearance_granted" | "clearance_denied" | "kyc_review" | "admin_cancel" | "dispute_resolution"
+      method: v.optional(v.string()), // "otp" | "passcode"
+      ok: v.boolean(),
+      detail: v.optional(v.string()),
+      at: v.number(),
+    })
+      .index("by_at", ["at"])
+      .index("by_kind", ["kind"]),
+
+    // Brute-force lockout state for emergency passcode attempts (single row: key "global")
+    adminLockout: defineTable({
+      key: v.string(),
+      fails: v.number(),
+      lockedUntil: v.optional(v.number()),
+      updatedAt: v.number(),
+    }).index("by_key", ["key"]),
+
     // Dispute arbitration — double-blind flags from customers and workers
     disputes: defineTable({
       bookingId: v.id("bookings"),

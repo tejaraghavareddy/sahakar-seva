@@ -1,5 +1,5 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
-import { query, mutation, QueryCtx } from "./_generated/server";
+import { query, mutation, QueryCtx, MutationCtx } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
 import { v } from "convex/values";
 
@@ -19,24 +19,169 @@ async function isAdminUser(
   return user.role === "admin";
 }
 
+/* ── Security: audit ledger + passcode brute-force lockout ── */
+
+const MAX_FAILS = 5;
+const LOCKOUT_MS = 10 * 60 * 1000; // 10 minutes
+
+type Ctx = MutationCtx;
+
+async function audit(
+  ctx: Ctx,
+  entry: {
+    actorId?: Id<"users"> | null;
+    email?: string;
+    kind: string;
+    method?: string;
+    ok: boolean;
+    detail?: string;
+  },
+) {
+  await ctx.db.insert("adminAuditLog", {
+    actorId: entry.actorId ?? undefined,
+    email: entry.email,
+    kind: entry.kind,
+    method: entry.method,
+    ok: entry.ok,
+    detail: entry.detail,
+    at: Date.now(),
+  });
+}
+
+async function getLockout(ctx: Ctx) {
+  return await ctx.db
+    .query("adminLockout")
+    .withIndex("by_key", (q) => q.eq("key", "global"))
+    .first();
+}
+
+async function recordFail(ctx: MutationCtx) {
+  const now = Date.now();
+  const lock = await getLockout(ctx);
+  const fails = (lock?.fails ?? 0) + 1;
+  const lockedUntil =
+    fails >= MAX_FAILS ? now + LOCKOUT_MS : lock?.lockedUntil;
+  if (lock) {
+    await ctx.db.patch(lock._id, { fails, lockedUntil, updatedAt: now });
+  } else {
+    await ctx.db.insert("adminLockout", {
+      key: "global",
+      fails,
+      lockedUntil,
+      updatedAt: now,
+    });
+  }
+  return { fails, lockedUntil };
+}
+
 /**
  * Emergency clearance: master admin email OR the offline federation
  * passcode for local testing (fixed emergency code). Grants admin role.
+ *
+ * Security hardening:
+ *  - every attempt (success or failure) is written to the adminAuditLog
+ *  - 5 wrong passcodes lock attempts for 10 minutes (brute-force protection)
+ *  - anonymous (guest) sessions are refused the passcode path
  */
 export const emergencyUnlock = mutation({
   args: { passcode: v.string() },
   handler: async (ctx, args) => {
     const userId = await requireUser(ctx);
-    const EMERGENCY = "SAHAKAR-BOARD-2026";
-    if (args.passcode.trim() !== EMERGENCY) {
-      throw new Error("Invalid emergency passcode");
-    }
     const user = await ctx.db.get(userId);
     if (!user) throw new Error("Not authenticated");
+
+    // Anonymous sessions must not gain board clearance via a static passcode.
+    if (user.isAnonymous) {
+      await audit(ctx, {
+        actorId: userId,
+        kind: "clearance_denied",
+        method: "passcode",
+        ok: false,
+        detail: "Anonymous session attempted emergency unlock",
+      });
+      throw new Error(
+        "Guest sessions cannot receive board clearance — sign in with your officer email instead",
+      );
+    }
+
+    // Brute-force lockout check
+    const lock = await getLockout(ctx);
+    const now = Date.now();
+    if (lock?.lockedUntil && lock.lockedUntil > now) {
+      await audit(ctx, {
+        actorId: userId,
+        email: user.email,
+        kind: "clearance_denied",
+        method: "passcode",
+        ok: false,
+        detail: "Attempt while locked out",
+      });
+      const mins = Math.ceil((lock.lockedUntil - now) / 60_000);
+      throw new Error(
+        `Too many failed attempts — locked for ${mins} more minute${mins === 1 ? "" : "s"}`,
+      );
+    }
+
+    const EMERGENCY = "SAHAKAR-BOARD-2026";
+    if (args.passcode.trim() !== EMERGENCY) {
+      const { fails, lockedUntil } = await recordFail(ctx);
+      await audit(ctx, {
+        actorId: userId,
+        email: user.email,
+        kind: "clearance_denied",
+        method: "passcode",
+        ok: false,
+        detail: lockedUntil ? "Wrong passcode — now locked out" : `Wrong passcode (${fails}/${MAX_FAILS})`,
+      });
+      throw new Error(
+        lockedUntil
+          ? "Too many failed attempts — locked for 10 minutes"
+          : `Invalid emergency passcode (${MAX_FAILS - fails} attempt${MAX_FAILS - fails === 1 ? "" : "s"} remaining)`,
+      );
+    }
+
+    // Success — reset lockout, grant role, audit.
+    if (lock) {
+      await ctx.db.patch(lock._id, { fails: 0, lockedUntil: undefined, updatedAt: now });
+    }
     if (user.role !== "admin") {
       await ctx.db.patch(userId, { role: "admin" });
     }
+    await audit(ctx, {
+      actorId: userId,
+      email: user.email,
+      kind: "clearance_granted",
+      method: "passcode",
+      ok: true,
+      detail: "Emergency passcode accepted — admin role granted",
+    });
     return { ok: true };
+  },
+});
+
+/** Audit trail of security events — cleared officers only. */
+export const auditLog = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await requireUser(ctx);
+    if (!(await isAdminUser(ctx, userId))) throw new Error("Forbidden");
+    const rows = await ctx.db.query("adminAuditLog").order("desc").take(100);
+    const actorNames: Record<string, string> = {};
+    for (const r of rows) {
+      if (r.actorId && !(r.actorId in actorNames)) {
+        const u = await ctx.db.get(r.actorId);
+        actorNames[r.actorId] = u?.email ?? u?.name ?? "unknown user";
+      }
+    }
+    return rows.map((r) => ({
+      _id: r._id,
+      kind: r.kind,
+      method: r.method,
+      ok: r.ok,
+      detail: r.detail,
+      at: r.at,
+      actor: r.actorId ? (actorNames[r.actorId] ?? "unknown") : "anonymous",
+    }));
   },
 });
 
@@ -179,6 +324,12 @@ export const reviewKyc = mutation({
     }
     const now = Date.now();
     const kycRef = `BGC-${now.toString(36).toUpperCase().slice(-8)}`;
+    await audit(ctx, {
+      actorId: userId,
+      kind: "kyc_review",
+      ok: true,
+      detail: `${args.approve ? "Approved" : "Rejected"} ${artisan.fullName} (${args.artisanId})`,
+    });
     await ctx.db.patch(args.artisanId, {
       kycStatus: args.approve ? "verified" : "rejected",
       ...(args.approve
@@ -199,6 +350,12 @@ export const adminCancelBooking = mutation({
     if (["completed", "settled", "cancelled"].includes(b.status)) {
       throw new Error("Booking already closed");
     }
+    await audit(ctx, {
+      actorId: userId,
+      kind: "admin_cancel",
+      ok: true,
+      detail: `Cancelled booking ${b.serviceName} (${b._id})`,
+    });
     await ctx.db.patch(b._id, {
       status: "cancelled",
       cancelledAt: Date.now(),

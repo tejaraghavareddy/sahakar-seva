@@ -23,9 +23,10 @@ import {
   CheckCircle2,
   XCircle,
   Plus,
+  ScrollText,
 } from "lucide-react";
 
-type TabId = "overview" | "gis" | "forecast" | "governance" | "societies" | "welfare" | "disputes";
+type TabId = "overview" | "gis" | "forecast" | "governance" | "societies" | "welfare" | "disputes" | "audit";
 
 const TABS: Array<{ id: TabId; label: string; icon: typeof Users }> = [
   { id: "overview", label: "Overview", icon: Users },
@@ -35,6 +36,7 @@ const TABS: Array<{ id: TabId; label: string; icon: typeof Users }> = [
   { id: "societies", label: "District Societies", icon: Building2 },
   { id: "welfare", label: "Welfare & Dividend", icon: HeartPulse },
   { id: "disputes", label: "Disputes", icon: ShieldAlert },
+  { id: "audit", label: "Security Audit", icon: ScrollText },
 ];
 
 export default function Admin() {
@@ -108,6 +110,7 @@ export default function Admin() {
           {tab === "societies" && <SocietiesPanel />}
           {tab === "welfare" && <WelfarePanel />}
           {tab === "disputes" && <DisputesPanel />}
+          {tab === "audit" && <AuditPanel />}
         </div>
       </main>
     </div>
@@ -923,6 +926,62 @@ function DisputesPanel() {
           ))}
         </div>
       </Panel>
+    </div>
+  );
+}
+
+/* ── Security Audit tab ── */
+
+function AuditPanel() {
+  const log = useQuery(api.admin.auditLog, {});
+  if (log === undefined) return <LoadingPlaceholder text="Loading audit ledger…" />;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-3">
+        <span className="flex size-9 items-center justify-center rounded-xl bg-slate-900 text-white">
+          <ScrollText className="size-4" />
+        </span>
+        <div>
+          <h2 className="text-base font-extrabold text-slate-900">Federation Security Ledger</h2>
+          <p className="text-xs text-slate-500">
+            Every board clearance attempt and privileged action, append-only.
+          </p>
+        </div>
+      </div>
+
+      <Panel title="Recent events" bodyClassName="p-0">
+        <div className="max-h-[520px] overflow-y-auto">
+          {log.length === 0 && (
+            <p className="py-10 text-center text-xs text-slate-500">No security events recorded yet.</p>
+          )}
+          {log.map((e) => (
+            <div key={e._id} className="flex items-center gap-3 border-b border-slate-100 px-4 py-3 last:border-0">
+              <span
+                className={`flex size-7 shrink-0 items-center justify-center rounded-lg text-[11px] font-black ${
+                  e.ok ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700"
+                }`}
+              >
+                {e.ok ? "✓" : "✕"}
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-xs font-bold text-slate-900">{e.detail ?? e.kind}</p>
+                <p className="truncate text-[11px] text-slate-500">
+                  {e.actor} · {e.kind}
+                  {e.method ? ` (${e.method})` : ""} · {new Date(e.at).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}
+                </p>
+              </div>
+              <MonoBadge tone={e.ok ? "ok" : "warn"}>{e.ok ? "OK" : "DENIED"}</MonoBadge>
+            </div>
+          ))}
+        </div>
+      </Panel>
+
+      <p className="text-[11px] text-slate-400">
+        Hardening in place: 5 wrong passcodes lock clearance for 10 minutes; guest sessions are
+        refused the emergency passcode path; all privileged actions (KYC review, booking cancellation,
+        clearance grant/deny) are written to this append-only ledger.
+      </p>
     </div>
   );
 }

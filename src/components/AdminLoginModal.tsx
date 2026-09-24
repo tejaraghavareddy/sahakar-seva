@@ -223,7 +223,9 @@ export default function AdminLoginModal({ open, onClose, onSuccess }: AdminLogin
 
         <div className="rounded-b-3xl border-t border-slate-200 bg-slate-50 px-5 py-3">
           <p className="text-center text-[10px] text-slate-400">
-            All clearance attempts are logged in the federation audit ledger.
+            All clearance attempts are logged in the federation audit ledger ·
+            5 wrong passcodes lock access for 10 minutes · guest sessions
+            cannot unlock via passcode.
           </p>
         </div>
       </div>
