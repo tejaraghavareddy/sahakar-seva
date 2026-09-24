@@ -17,6 +17,7 @@ import {
   TlButton,
 } from "@/components/terminal";
 import { IdCardDialog } from "@/components/IdCardDialog";
+import ForecastCard from "@/components/ForecastCard";
 import {
   Loader2,
   LogOut,
@@ -278,6 +279,10 @@ export default function Dashboard() {
 
         {artisan && (
           <div className="mt-6 grid gap-5 lg:grid-cols-3">
+            {/* AI Demand & Fair-Price Forecasting */}
+            <div className="lg:col-span-3">
+              <ForecastCard />
+            </div>
             {/* Left column */}
             <div className="flex flex-col gap-5">
               {/* Telemetry */}
