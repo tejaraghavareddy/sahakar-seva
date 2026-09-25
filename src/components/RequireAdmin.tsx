@@ -3,7 +3,6 @@ import { Link } from "react-router";
 import { useSession } from "@/App";
 import { ShieldAlert } from "lucide-react";
 import AdminLoginModal from "@/components/AdminLoginModal";
-import { useAuth } from "@/hooks/use-auth";
 
 /**
  * Federation-officer gate. Non-admins see a polite notice explaining that
@@ -12,10 +11,9 @@ import { useAuth } from "@/hooks/use-auth";
  */
 export default function RequireAdmin({ children }: { children: ReactNode }) {
   const { session, isResolving } = useSession();
-  const { isAuthenticated, isLoading } = useAuth();
   const [showLogin, setShowLogin] = useState(false);
 
-  if (isResolving || isLoading) {
+  if (isResolving) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-50">
         <div className="animate-pulse text-sm font-semibold text-slate-400">

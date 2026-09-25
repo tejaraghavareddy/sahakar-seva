@@ -93,6 +93,9 @@ function Carousel({
 
   React.useEffect(() => {
     if (!api) return
+    // Vendored shadcn/ui file: initial select-state sync + event subscription
+    // is the standard embla-carousel pattern; leaving as-is intentionally.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     onSelect(api)
     api.on("reInit", onSelect)
     api.on("select", onSelect)

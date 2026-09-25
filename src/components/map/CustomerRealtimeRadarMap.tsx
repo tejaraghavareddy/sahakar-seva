@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { MapContainer, TileLayer, CircleMarker, Polyline, Tooltip, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -74,18 +74,20 @@ export default function CustomerRealtimeRadarMap({
   height = "300px",
 }: CustomerRadarMapProps) {
   const [simProgress, setSimProgress] = useState(0);
-  const [arrived, setArrived] = useState(false);
   const workerDist = worker ? haversine(worker.lat, worker.lng, customerLat, customerLng) : 0;
   const workerEta = worker ? estimateEtaMinutes(workerDist) : 0;
 
-  // When the worker's real telemetry comes within 50 m, mark arrival + chime once
+  // Arrival is derived from live telemetry; the chime fires once per arrival.
+  const arrived = !!worker && workerDist <= ARRIVED_RADIUS_M;
+  const chimeRef = useRef(false);
   useEffect(() => {
-    if (!worker || arrived) return;
-    if (workerDist <= ARRIVED_RADIUS_M) {
-      setArrived(true);
+    if (arrived && !chimeRef.current) {
+      chimeRef.current = true;
       playArrivalChime();
+    } else if (!arrived) {
+      chimeRef.current = false;
     }
-  }, [worker, workerDist, arrived]);
+  }, [arrived]);
 
   // Simulate smooth interpolation toward destination
   useEffect(() => {

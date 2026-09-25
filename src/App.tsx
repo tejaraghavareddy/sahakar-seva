@@ -11,7 +11,6 @@ import {
 } from "react";
 import {
   BrowserRouter,
-  Navigate,
   Route,
   Routes,
   useLocation,

@@ -50,9 +50,43 @@ interface RecognitionHandle {
 
 type ResultCb = (transcript: string) => void;
 
-function getRecognitionCtor(): (new () => any) | null {
+interface SpeechRecognitionAlternativeLike {
+  transcript: string;
+}
+
+interface SpeechRecognitionResultLike {
+  0: SpeechRecognitionAlternativeLike;
+  isFinal?: boolean;
+  length: number;
+}
+
+interface SpeechRecognitionEventLike {
+  results: { 0: SpeechRecognitionResultLike; length: number };
+}
+
+interface SpeechRecognitionErrorEventLike {
+  error?: string;
+}
+
+interface SpeechRecognitionLike {
+  lang: string;
+  interimResults: boolean;
+  maxAlternatives: number;
+  onresult: ((event: SpeechRecognitionEventLike) => void) | null;
+  onerror: ((event: SpeechRecognitionErrorEventLike) => void) | null;
+  onend: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+}
+
+type SpeechRecognitionCtor = new () => SpeechRecognitionLike;
+
+function getRecognitionCtor(): SpeechRecognitionCtor | null {
   try {
-    const w = window as unknown as Record<string, any>;
+    const w = window as unknown as {
+      SpeechRecognition?: SpeechRecognitionCtor;
+      webkitSpeechRecognition?: SpeechRecognitionCtor;
+    };
     return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
   } catch {
     return null;
@@ -80,11 +114,11 @@ export function createRecognition(
     rec.lang = lang;
     rec.interimResults = false;
     rec.maxAlternatives = 1;
-    rec.onresult = (event: any) => {
+    rec.onresult = (event) => {
       const transcript = event.results?.[0]?.[0]?.transcript ?? "";
       if (transcript) onResult(transcript);
     };
-    rec.onerror = (event: any) => {
+    rec.onerror = (event) => {
       onError?.(event?.error ?? "error");
     };
     rec.onend = () => {

@@ -1,4 +1,3 @@
-import { useState } from "react";
 import InteractiveMapPicker, { type PickedLocation } from "./InteractiveMapPicker";
 import { MapPin, X } from "lucide-react";
 
