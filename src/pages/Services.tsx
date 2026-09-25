@@ -45,7 +45,13 @@ export default function Services() {
     const loading = artisans === undefined;
     let list = SERVICES.map((s) => {
       const a = serviceAvailability(byTrade, s.trade, loading);
-      return { ...s, artisanCount: a.artisanCount, distM: a.distM, etaM: a.etaM };
+      return {
+        ...s,
+        artisanCount: a.artisanCount,
+        outOfRange: a.outOfRange,
+        distM: a.distM,
+        etaM: a.etaM,
+      };
     }).filter((s) => {
       const inTrade = trade === "all" || s.trade === trade;
       const inSearch =
@@ -275,7 +281,15 @@ export default function Services() {
                         <h2 className="mt-3.5 text-sm font-bold text-slate-900">
                           {s.name}
                         </h2>
-                        {(s.artisanCount ?? 0) === 0 && (
+                        {(s.artisanCount ?? 0) === 0 && s.outOfRange > 0 && (
+                          <p className="mt-1 inline-flex w-fit items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-bold text-slate-500">
+                            <Navigation className="size-2.5" />
+                            {s.outOfRange} verified {s.trade}{" "}
+                            {s.outOfRange === 1 ? "artisan is" : "artisans are"} outside the
+                            dispatch radius
+                          </p>
+                        )}
+                        {(s.artisanCount ?? 0) === 0 && s.outOfRange === 0 && (
                           <p className="mt-1 inline-flex w-fit items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-bold text-slate-500">
                             <Navigation className="size-2.5" />
                             No verified {s.trade} artisans yet

@@ -148,7 +148,9 @@ describe("distance + ETA math behind the availability pills", () => {
     expect(Math.abs(d - 111_195)).toBeLessThan(50);
   });
 
-  it("reproduces the reported pill exactly: 190.7 km → '191 km away · ~523 min arrival'", () => {
+  it("formats and times the 190.7 km trip that produced the reported '191 km / 523 min' pill", () => {
+    // The math is correct; the pill is now unreachable because
+    // availability.ts refuses to surface anyone past SERVICE_RADIUS_M.
     expect(formatDistance(190_700)).toBe("191 km");
     expect(estimateEtaMinutes(190_700)).toBe(523);
   });

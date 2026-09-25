@@ -91,10 +91,19 @@ async function recordFail(ctx: MutationCtx) {
  *  - 5 wrong passcodes lock attempts for 10 minutes (brute-force protection)
  *  - a correct passcode converts a guest session into the shared demo admin
  *    account (demo.admin@sahakar.demo) so the passcode alone can grant clearance
+ *
+ * IMPORTANT: a denial is returned as *data* ({ ok: false, message }), never
+ * thrown. Convex rolls the entire transaction back when a mutation throws, so
+ * throwing here would silently discard the failure counter and the audit row —
+ * i.e. the lockout would never engage and the ledger would stay empty.
  */
+export type EmergencyUnlockResult =
+  | { ok: true }
+  | { ok: false; message: string };
+
 export const emergencyUnlock = mutation({
   args: { passcode: v.string() },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<EmergencyUnlockResult> => {
     const userId = await requireUser(ctx);
     const user = await ctx.db.get(userId);
     if (!user) throw new Error("Not authenticated");
@@ -112,9 +121,10 @@ export const emergencyUnlock = mutation({
         detail: "Attempt while locked out",
       });
       const mins = Math.ceil((lock.lockedUntil - now) / 60_000);
-      throw new Error(
-        `Too many failed attempts — locked for ${mins} more minute${mins === 1 ? "" : "s"}`,
-      );
+      return {
+        ok: false,
+        message: `Too many failed attempts — locked for ${mins} more minute${mins === 1 ? "" : "s"}`,
+      };
     }
 
     const EMERGENCY = "SAHAKAR-BOARD-2026";
@@ -128,11 +138,12 @@ export const emergencyUnlock = mutation({
         ok: false,
         detail: lockedUntil ? "Wrong passcode — now locked out" : `Wrong passcode (${fails}/${MAX_FAILS})`,
       });
-      throw new Error(
-        lockedUntil
+      return {
+        ok: false,
+        message: lockedUntil
           ? "Too many failed attempts — locked for 10 minutes"
           : `Invalid emergency passcode (${MAX_FAILS - fails} attempt${MAX_FAILS - fails === 1 ? "" : "s"} remaining)`,
-      );
+      };
     }
 
     // Success — reset lockout, grant role, audit.

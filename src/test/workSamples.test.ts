@@ -1,0 +1,426 @@
+import { describe, expect, it } from "vitest";
+import {
+  api,
+  must,
+  seedAdmin,
+  seedArtisan,
+  seedCustomer,
+  seedWorker,
+  setupTest,
+} from "./convexHarness";
+
+/** Insert a fake storage file the way `generateUploadUrl` + PUT would. */
+async function seedStorageFile(t: ReturnType<typeof setupTest>, size = 1000) {
+  return t.run(async (ctx) => ctx.storage.store(new Blob([new Uint8Array(size).fill(7)])));
+}
+
+describe("workSamples:generateUploadUrl", () => {
+  it("refuses a signed-out caller", async () => {
+    const t = setupTest();
+    await expect(
+      t.mutation(api.workSamples.generateUploadUrl, { mimeType: "image/png" }),
+    ).rejects.toThrow("Not authenticated");
+  });
+
+  it("accepts the supported image types", async () => {
+    const t = setupTest();
+    const { as } = await seedWorker(t);
+    for (const mimeType of ["image/jpeg", "image/png", "image/webp", "image/heic"]) {
+      await expect(as.mutation(api.workSamples.generateUploadUrl, { mimeType })).resolves.toBeTypeOf(
+        "string",
+      );
+    }
+  });
+
+  it("rejects anything that is not an image", async () => {
+    const t = setupTest();
+    const { as } = await seedWorker(t);
+    for (const mimeType of ["application/pdf", "text/html", "image/svg+xml", "video/mp4"]) {
+      await expect(
+        as.mutation(api.workSamples.generateUploadUrl, { mimeType }),
+      ).rejects.toThrow("Only JPG, PNG, WebP or HEIC");
+    }
+  });
+});
+
+describe("workSamples:completeUpload", () => {
+  it("refuses a signed-out caller", async () => {
+    const t = setupTest();
+    const storageId = await seedStorageFile(t);
+    await expect(
+      t.mutation(api.workSamples.completeUpload, { storageId, mimeType: "image/png" }),
+    ).rejects.toThrow("Not authenticated");
+  });
+
+  it("asks the worker to finish the trade profile first", async () => {
+    const t = setupTest();
+    const { as } = await seedWorker(t);
+    const storageId = await seedStorageFile(t);
+    await expect(
+      as.mutation(api.workSamples.completeUpload, { storageId, mimeType: "image/png" }),
+    ).rejects.toThrow("Complete your trade profile first");
+  });
+
+  it("refuses uploads from a worker removed from the federation", async () => {
+    const t = setupTest();
+    const w = await seedWorker(t);
+    await seedArtisan(t, w.id, { removedAt: Date.now() });
+    const storageId = await seedStorageFile(t);
+    await expect(
+      w.as.mutation(api.workSamples.completeUpload, { storageId, mimeType: "image/png" }),
+    ).rejects.toThrow("removed from the federation");
+  });
+
+  it("refuses a storage id that was never uploaded", async () => {
+    const t = setupTest();
+    const w = await seedWorker(t);
+    await seedArtisan(t, w.id);
+    const storageId = await seedStorageFile(t);
+    await t.run((ctx) => ctx.storage.delete(storageId));
+    await expect(
+      w.as.mutation(api.workSamples.completeUpload, { storageId, mimeType: "image/png" }),
+    ).rejects.toThrow("Upload not found");
+  });
+
+  it("refuses images over 5 MB", async () => {
+    const t = setupTest();
+    const w = await seedWorker(t);
+    await seedArtisan(t, w.id);
+    const storageId = await seedStorageFile(t, 5 * 1024 * 1024 + 1);
+    await expect(
+      w.as.mutation(api.workSamples.completeUpload, { storageId, mimeType: "image/png" }),
+    ).rejects.toThrow("larger than 5 MB");
+  });
+
+  it("caps the gallery at 6 photos", async () => {
+    const t = setupTest();
+    const w = await seedWorker(t);
+    await seedArtisan(t, w.id);
+    for (let i = 0; i < 6; i++) {
+      const storageId = await seedStorageFile(t);
+      await w.as.mutation(api.workSamples.completeUpload, {
+        storageId,
+        mimeType: "image/png",
+        caption: `sample ${i}`,
+      });
+    }
+    const extra = await seedStorageFile(t);
+    await expect(
+      w.as.mutation(api.workSamples.completeUpload, { storageId: extra, mimeType: "image/png" }),
+    ).rejects.toThrow("up to 6 work photos");
+  });
+
+  it("registers a pending sample and lists it newest first with a URL", async () => {
+    const t = setupTest();
+    const w = await seedWorker(t);
+    const artisan = await seedArtisan(t, w.id);
+    const storageId = await seedStorageFile(t);
+
+    const sampleId = await w.as.mutation(api.workSamples.completeUpload, {
+      storageId,
+      mimeType: "image/png",
+      caption: "  rewiring a panel  ",
+    });
+    const row = must(await t.run((ctx) => ctx.db.get(sampleId)), "sample");
+    expect(row.artisanId).toBe(artisan);
+    expect(row.userId).toBe(w.id);
+    expect(row.status).toBe("pending");
+    expect(row.caption).toBe("rewiring a panel");
+
+    const mine = await w.as.query(api.workSamples.mySamples);
+    expect(mine).toHaveLength(1);
+    expect(mine[0].url).toBeTypeOf("string");
+  });
+
+  it("mySamples is empty for a member who is not a worker", async () => {
+    const t = setupTest();
+    const c = await seedCustomer(t);
+    expect(await c.as.query(api.workSamples.mySamples)).toEqual([]);
+  });
+});
+
+describe("workSamples:deleteSample", () => {
+  it("refuses a signed-out caller and another worker's sample", async () => {
+    const t = setupTest();
+    const w1 = await seedWorker(t, { email: "w1@x.com" });
+    const w2 = await seedWorker(t, { email: "w2@x.com" });
+    await seedArtisan(t, w1.id);
+    await seedArtisan(t, w2.id);
+    const sampleId = await w1.as.mutation(api.workSamples.completeUpload, {
+      storageId: await seedStorageFile(t),
+      mimeType: "image/png",
+    });
+
+    await expect(
+      t.mutation(api.workSamples.deleteSample, { sampleId }),
+    ).rejects.toThrow("Not authenticated");
+    await expect(
+      w2.as.mutation(api.workSamples.deleteSample, { sampleId }),
+    ).rejects.toThrow("Forbidden");
+  });
+
+  it("deletes a pending sample and its stored file", async () => {
+    const t = setupTest();
+    const w = await seedWorker(t);
+    await seedArtisan(t, w.id);
+    const storageId = await seedStorageFile(t);
+    const sampleId = await w.as.mutation(api.workSamples.completeUpload, {
+      storageId,
+      mimeType: "image/png",
+    });
+
+    await w.as.mutation(api.workSamples.deleteSample, { sampleId });
+    expect(await t.run((ctx) => ctx.db.get(sampleId))).toBeNull();
+    expect(await w.as.query(api.workSamples.mySamples)).toEqual([]);
+  });
+
+  it("refuses to delete a sample the board already reviewed", async () => {
+    const t = setupTest();
+    const a = await seedAdmin(t);
+    const w = await seedWorker(t);
+    await seedArtisan(t, w.id, { kycStatus: "pending" });
+    const sampleId = await w.as.mutation(api.workSamples.completeUpload, {
+      storageId: await seedStorageFile(t),
+      mimeType: "image/png",
+    });
+    await a.as.mutation(api.workSamples.reviewSample, { sampleId, approve: false });
+
+    await expect(
+      w.as.mutation(api.workSamples.deleteSample, { sampleId }),
+    ).rejects.toThrow("cannot be deleted");
+  });
+});
+
+describe("workSamples:reviewQueue", () => {
+  it("is admin-only", async () => {
+    const t = setupTest();
+    await expect(t.query(api.workSamples.reviewQueue)).rejects.toThrow("Not authenticated");
+    const c = await seedCustomer(t);
+    await expect(c.as.query(api.workSamples.reviewQueue)).rejects.toThrow("Forbidden");
+  });
+
+  it("lists pending samples oldest first with worker details", async () => {
+    const t = setupTest();
+    const a = await seedAdmin(t);
+    const w = await seedWorker(t);
+    await seedArtisan(t, w.id, {
+      fullName: "Ramesh",
+      trade: "electrician",
+      district: "Kurnool",
+      phone: "9000000000",
+      kycStatus: "pending",
+    });
+    const first = await w.as.mutation(api.workSamples.completeUpload, {
+      storageId: await seedStorageFile(t),
+      mimeType: "image/png",
+      caption: "old",
+    });
+    const second = await w.as.mutation(api.workSamples.completeUpload, {
+      storageId: await seedStorageFile(t),
+      mimeType: "image/jpeg",
+      caption: "new",
+    });
+
+    const queue = await a.as.query(api.workSamples.reviewQueue);
+    expect(queue.map((q) => q._id)).toEqual([first, second]);
+    expect(queue[0].fullName).toBe("Ramesh");
+    expect(queue[0].trade).toBe("electrician");
+    expect(queue[0].district).toBe("Kurnool");
+    expect(queue[0].kycStatus).toBe("pending");
+    expect(queue[0].url).toBeTypeOf("string");
+  });
+
+  it("drops a sample from the queue once reviewed", async () => {
+    const t = setupTest();
+    const a = await seedAdmin(t);
+    const w = await seedWorker(t);
+    await seedArtisan(t, w.id);
+    const sampleId = await w.as.mutation(api.workSamples.completeUpload, {
+      storageId: await seedStorageFile(t),
+      mimeType: "image/png",
+    });
+    await a.as.mutation(api.workSamples.reviewSample, { sampleId, approve: true });
+    expect(await a.as.query(api.workSamples.reviewQueue)).toEqual([]);
+  });
+});
+
+describe("workSamples:reviewSample", () => {
+  it("is admin-only", async () => {
+    const t = setupTest();
+    const c = await seedCustomer(t);
+    const w = await seedWorker(t);
+    await seedArtisan(t, w.id);
+    const sampleId = await w.as.mutation(api.workSamples.completeUpload, {
+      storageId: await seedStorageFile(t),
+      mimeType: "image/png",
+    });
+    await expect(
+      c.as.mutation(api.workSamples.reviewSample, { sampleId, approve: true }),
+    ).rejects.toThrow("Forbidden");
+  });
+
+  it("refuses to review the same sample twice", async () => {
+    const t = setupTest();
+    const a = await seedAdmin(t);
+    const w = await seedWorker(t);
+    await seedArtisan(t, w.id);
+    const sampleId = await w.as.mutation(api.workSamples.completeUpload, {
+      storageId: await seedStorageFile(t),
+      mimeType: "image/png",
+    });
+    await a.as.mutation(api.workSamples.reviewSample, { sampleId, approve: true });
+    await expect(
+      a.as.mutation(api.workSamples.reviewSample, { sampleId, approve: true }),
+    ).rejects.toThrow("already reviewed");
+  });
+
+  it("approving with KYC verified sets skill + KYC verified and issues the credential", async () => {
+    const t = setupTest();
+    const a = await seedAdmin(t);
+    const w = await seedWorker(t);
+    const artisan = await seedArtisan(t, w.id, {
+      kycStatus: "verified",
+      quizPassed: false,
+    });
+    const sampleId = await w.as.mutation(api.workSamples.completeUpload, {
+      storageId: await seedStorageFile(t),
+      mimeType: "image/png",
+    });
+
+    expect(await a.as.mutation(api.workSamples.reviewSample, { sampleId, approve: true })).toEqual({
+      skillVerified: true,
+    });
+
+    const row = must(await t.run((ctx) => ctx.db.get(artisan)), "artisan");
+    expect(row.skillStatus).toBe("verified");
+    expect(row.skillVerifiedAt).toBeGreaterThan(0);
+    expect(row.skillRef).toMatch(/^SKC-/);
+    expect(row.kycStatus).toBe("verified");
+    expect(row.quizPassed).toBe(true);
+    expect(row.credentialId).toMatch(/^SSC-\d{4}-[0-9A-F]{4}$/);
+
+    const notices = await w.as.query(api.workerAdmin.myNotifications);
+    expect(notices[0].body).toContain("VERIFIED");
+  });
+
+  it("approving with KYC still pending verifies skill only", async () => {
+    const t = setupTest();
+    const a = await seedAdmin(t);
+    const w = await seedWorker(t);
+    const artisan = await seedArtisan(t, w.id, { kycStatus: "pending", quizPassed: false });
+    const sampleId = await w.as.mutation(api.workSamples.completeUpload, {
+      storageId: await seedStorageFile(t),
+      mimeType: "image/png",
+    });
+
+    await a.as.mutation(api.workSamples.reviewSample, { sampleId, approve: true });
+    const row = must(await t.run((ctx) => ctx.db.get(artisan)), "artisan");
+    expect(row.skillStatus).toBe("verified");
+    expect(row.quizPassed).toBe(false);
+    expect(row.credentialId).toBeUndefined();
+
+    const notices = await w.as.query(api.workerAdmin.myNotifications);
+    expect(notices[0].body).toContain("finish KYC");
+  });
+
+  it("does not overwrite an existing credential on a second approval", async () => {
+    const t = setupTest();
+    const a = await seedAdmin(t);
+    const w = await seedWorker(t);
+    const artisan = await seedArtisan(t, w.id, {
+      kycStatus: "verified",
+      quizPassed: true,
+      credentialId: "SSC-2026-AAAA",
+    });
+    const sampleId = await w.as.mutation(api.workSamples.completeUpload, {
+      storageId: await seedStorageFile(t),
+      mimeType: "image/png",
+    });
+    await a.as.mutation(api.workSamples.reviewSample, { sampleId, approve: true });
+    expect(must(await t.run((ctx) => ctx.db.get(artisan)), "artisan").credentialId).toBe(
+      "SSC-2026-AAAA",
+    );
+  });
+
+  it("rejecting records the reason, tells the worker, and leaves skill unverified", async () => {
+    const t = setupTest();
+    const a = await seedAdmin(t);
+    const w = await seedWorker(t);
+    const artisan = await seedArtisan(t, w.id, { kycStatus: "verified", quizPassed: false });
+    const sampleId = await w.as.mutation(api.workSamples.completeUpload, {
+      storageId: await seedStorageFile(t),
+      mimeType: "image/png",
+    });
+
+    expect(
+      await a.as.mutation(api.workSamples.reviewSample, {
+        sampleId,
+        approve: false,
+        note: "Photo is too blurry",
+      }),
+    ).toEqual({ skillVerified: false });
+
+    const sample = must(await t.run((ctx) => ctx.db.get(sampleId)), "sample");
+    expect(sample.status).toBe("rejected");
+    expect(sample.reviewNote).toBe("Photo is too blurry");
+    expect(sample.reviewedBy).toBe(a.id);
+
+    const row = must(await t.run((ctx) => ctx.db.get(artisan)), "artisan");
+    expect(row.skillStatus).not.toBe("verified");
+    expect(row.credentialId).toBeUndefined();
+
+    const notices = await w.as.query(api.workerAdmin.myNotifications);
+    expect(notices[0].body).toContain("Photo is too blurry");
+  });
+});
+
+describe("workSamples:reviewKycFromSkillTab", () => {
+  it("is admin-only and only acts on pending KYC", async () => {
+    const t = setupTest();
+    const a = await seedAdmin(t);
+    const c = await seedCustomer(t);
+    const w = await seedWorker(t);
+    const artisan = await seedArtisan(t, w.id, { kycStatus: "verified" });
+
+    await expect(
+      c.as.mutation(api.workSamples.reviewKycFromSkillTab, { artisanId: artisan, approve: true }),
+    ).rejects.toThrow("Forbidden");
+    await expect(
+      a.as.mutation(api.workSamples.reviewKycFromSkillTab, { artisanId: artisan, approve: true }),
+    ).rejects.toThrow("KYC is not pending");
+  });
+
+  it("approving issues a reference and notifies the worker", async () => {
+    const t = setupTest();
+    const a = await seedAdmin(t);
+    const w = await seedWorker(t);
+    const artisan = await seedArtisan(t, w.id, { kycStatus: "pending" });
+
+    await a.as.mutation(api.workSamples.reviewKycFromSkillTab, {
+      artisanId: artisan,
+      approve: true,
+    });
+    const row = must(await t.run((ctx) => ctx.db.get(artisan)), "artisan");
+    expect(row.kycStatus).toBe("verified");
+    expect(row.kycRef).toMatch(/^BGC-/);
+
+    const notices = await w.as.query(api.workerAdmin.myNotifications);
+    expect(notices[0].title).toContain("KYC verification approved");
+  });
+
+  it("rejecting tells the worker the reason", async () => {
+    const t = setupTest();
+    const a = await seedAdmin(t);
+    const w = await seedWorker(t);
+    const artisan = await seedArtisan(t, w.id, { kycStatus: "pending" });
+
+    await a.as.mutation(api.workSamples.reviewKycFromSkillTab, {
+      artisanId: artisan,
+      approve: false,
+      note: "ID number did not match",
+    });
+    expect(must(await t.run((ctx) => ctx.db.get(artisan)), "artisan").kycStatus).toBe("rejected");
+    const notices = await w.as.query(api.workerAdmin.myNotifications);
+    expect(notices[0].body).toContain("ID number did not match");
+  });
+});

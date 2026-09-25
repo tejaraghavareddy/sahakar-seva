@@ -5,11 +5,7 @@ import { api } from "@/convex/_generated/api";
 import type { Doc, Id } from "@/convex/_generated/dataModel";
 import { Link, useNavigate } from "react-router";
 import { useLang } from "@/lib/i18n";
-import {
-  SOCIETIES,
-  TRADES,
-  type TradeId,
-} from "@/lib/trades";
+import { TRADES, type TradeId } from "@/lib/trades";
 import {
   LanguagePicker,
   MonoBadge,
@@ -362,6 +358,9 @@ function StepProfile({
   onSubmit: () => void;
   t: TT;
 }) {
+  // Real registered societies — a hard-coded list here would store a societyId
+  // that matches no document, so every member count on the board would read 0.
+  const societies = useQuery(api.societies.directory, {});
   return (
     <Panel tag="step 1/4">
       <form
@@ -460,7 +459,9 @@ function StepProfile({
             className="tl-input"
             value={form.societyId}
             onChange={(e) => {
-              const s = SOCIETIES.find((x) => x.id === e.target.value);
+              // Real registered societies, so the artisan's societyId matches a
+              // live document and member counts on the admin console are correct.
+              const s = societies?.find((x) => x._id === e.target.value);
               update("societyId", e.target.value);
               if (s) {
                 update("district", s.district);
@@ -470,9 +471,9 @@ function StepProfile({
             required
           >
             <option value="">—</option>
-            {SOCIETIES.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
+            {(societies ?? []).map((s) => (
+              <option key={s._id} value={s._id}>
+                {s.name} · {s.district}
               </option>
             ))}
           </select>

@@ -55,6 +55,12 @@ export default function BookingDetail() {
   const confirmUtr = useMutation(api.bookings.confirmUtr);
   const cancelBooking = useMutation(api.bookings.cancel);
   const raiseDispute = useMutation(api.disputes.raise);
+  // The raiser is the only participant who needs to see the verdict, so the
+  // arbitration board's decision is read back here rather than staying admin-only.
+  const myDispute = useQuery(
+    api.disputes.myDisputeForBooking,
+    booking ? { bookingId: booking._id } : "skip",
+  );
 
   const [utr, setUtr] = useState("");
   const [chat, setChat] = useState("");
@@ -73,7 +79,9 @@ export default function BookingDetail() {
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    // Guarded: scrollIntoView is missing in some embedded webviews and in any
+    // non-DOM render, where an unguarded call would take the whole page down.
+    chatEndRef.current?.scrollIntoView?.({ behavior: "smooth" });
   }, [messages?.length]);
 
   if (booking === undefined) {
@@ -496,7 +504,29 @@ export default function BookingDetail() {
             )}
 
             {/* Raise dispute (double-blind flag) */}
-            {!showFlag ? (
+            {myDispute ? (
+              <div
+                className={`rounded-xl border px-4 py-3 ${
+                  myDispute.status === "open"
+                    ? "border-amber-200 bg-amber-50"
+                    : myDispute.status === "resolved"
+                      ? "border-emerald-200 bg-emerald-50"
+                      : "border-slate-200 bg-slate-50"
+                }`}
+              >
+                <p className="text-xs font-bold text-slate-800">
+                  ⚑ Your dispute is {myDispute.status === "open" ? "with the board" : myDispute.status}
+                </p>
+                <p className="mt-1 text-[11px] leading-relaxed text-slate-600">
+                  You reported: {myDispute.details}
+                </p>
+                {myDispute.resolution && (
+                  <p className="mt-1.5 text-[11px] italic text-slate-600">
+                    Board note: {myDispute.resolution}
+                  </p>
+                )}
+              </div>
+            ) : !showFlag ? (
               <button
                 type="button"
                 onClick={() => setShowFlag(true)}

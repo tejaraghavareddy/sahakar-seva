@@ -25,7 +25,8 @@ const STORAGE_KEY = "sahakar.lang";
 /* ---------------- Dictionary ---------------- */
 
 type Dict = Record<string, string>;
-import { GW_BN } from "./i18n.bn-gw";
+import { GW_BN, PORTAL_BN } from "./i18n.bn-gw";
+import { SKILL_BN, SKILL_HI, SKILL_TA, SKILL_TE } from "./i18n.skill";
 
 const en: Dict = {
   gw_op_badge: "Federation live — dispatching now",
@@ -315,6 +316,11 @@ const en: Dict = {
    `en` must stay pure English — t() reads en[key] for the English UI too. */
 export function initBnGateway() {
   Object.assign(bn, GW_BN);
+  Object.assign(bn, PORTAL_BN);
+  Object.assign(bn, SKILL_BN);
+  Object.assign(hi, SKILL_HI);
+  Object.assign(te, SKILL_TE);
+  Object.assign(ta, SKILL_TA);
 }
 
 const hi: Dict = {
