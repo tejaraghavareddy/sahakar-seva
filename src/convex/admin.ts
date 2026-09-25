@@ -301,6 +301,36 @@ export const workerDirectory = query({
   },
 });
 
+/** Every registered member account — visible to cleared officers. */
+export const memberList = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await requireUser(ctx);
+    if (!(await isAdminUser(ctx, userId))) throw new Error("Forbidden");
+
+    const users = await ctx.db.query("users").order("desc").take(500);
+    const artisanRows = await ctx.db.query("artisans").collect();
+    const byUser = new Map(artisanRows.map((a) => [a.userId, a]));
+
+    return users.map((u) => {
+      const artisan = byUser.get(u._id);
+      return {
+        _id: u._id,
+        email: u.email,
+        name: u.name,
+        role: u.role,
+        isAnonymous: u.isAnonymous ?? false,
+        createdAt: u._creationTime,
+        workerId: artisan?._id,
+        workerName: artisan?.fullName,
+        workerTrade: artisan?.trade,
+        workerDistrict: artisan?.district,
+        kycStatus: artisan?.kycStatus,
+      };
+    });
+  },
+});
+
 export const amAdmin = query({
   args: {},
   handler: async (ctx) => {

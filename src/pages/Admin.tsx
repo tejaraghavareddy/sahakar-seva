@@ -24,15 +24,17 @@ import {
   XCircle,
   Plus,
   ScrollText,
+  UserPlus,
 } from "lucide-react";
 
-type TabId = "overview" | "gis" | "forecast" | "governance" | "societies" | "welfare" | "disputes" | "audit";
+type TabId = "overview" | "gis" | "forecast" | "governance" | "members" | "societies" | "welfare" | "disputes" | "audit";
 
 const TABS: Array<{ id: TabId; label: string; icon: typeof Users }> = [
   { id: "overview", label: "Overview", icon: Users },
   { id: "gis", label: "GIS Command Map", icon: Map },
   { id: "forecast", label: "AI Forecast", icon: BrainCircuit },
   { id: "governance", label: "KYC Queue", icon: ShieldCheck },
+  { id: "members", label: "Members", icon: UserPlus },
   { id: "societies", label: "District Societies", icon: Building2 },
   { id: "welfare", label: "Welfare & Dividend", icon: HeartPulse },
   { id: "disputes", label: "Disputes", icon: ShieldAlert },
@@ -114,6 +116,7 @@ export default function Admin() {
           {tab === "gis" && <GISPanel />}
           {tab === "forecast" && <ForecastPanel />}
           {tab === "governance" && <GovernancePanel />}
+          {tab === "members" && <MembersPanel />}
           {tab === "societies" && <SocietiesPanel />}
           {tab === "welfare" && <WelfarePanel />}
           {tab === "disputes" && <DisputesPanel />}
@@ -993,7 +996,66 @@ function AuditPanel() {
   );
 }
 
-/* ── Shared helpers ── */
+/* ── Members tab ── */
+
+function MembersPanel() {
+  const members = useQuery(api.admin.memberList, {});
+
+  if (members === undefined) return <LoadingPlaceholder text="Loading member registry…" />;
+
+  const real = members.filter((m) => !m.isAnonymous);
+  const guests = members.length - real.length;
+
+  return (
+    <div className="space-y-5">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <StatTile icon={<UserPlus className="size-3.5" />} label="Total accounts" value={String(members.length)} />
+        <StatTile icon={<Users className="size-3.5" />} label="Signed-up members" value={String(real.length)} tone="ok" />
+        <StatTile
+          icon={<ShieldCheck className="size-3.5" />}
+          label="Workers onboarded"
+          value={String(real.filter((m) => m.workerId).length)}
+        />
+        <StatTile icon={<ShieldAlert className="size-3.5" />} label="Guest sessions" value={String(guests)} />
+      </div>
+
+      <Panel title="Member registry — every account created on the platform" bodyClassName="p-0">
+        <div className="max-h-[560px] overflow-y-auto">
+          {real.length === 0 && (
+            <p className="py-10 text-center text-xs text-slate-500">No signed-up members yet.</p>
+          )}
+          {real.map((m) => (
+            <div key={m._id} className="flex items-center gap-3 border-b border-slate-100 px-4 py-3 last:border-0">
+              <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-[11px] font-black uppercase text-slate-600">
+                {(m.name || m.email || "?").charAt(0)}
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-xs font-bold text-slate-900">
+                  {m.name || m.email?.split("@")[0] || "Member"}
+                </p>
+                <p className="truncate text-[11px] text-slate-500">
+                  {m.email || "no email"} · joined {new Date(m.createdAt).toLocaleDateString("en-IN", { dateStyle: "medium" })}
+                </p>
+              </div>
+              {m.workerId ? (
+                <MonoBadge tone={m.kycStatus === "verified" ? "ok" : "warn"}>
+                  worker · {m.workerTrade}
+                </MonoBadge>
+              ) : (
+                <MonoBadge tone="neutral">customer</MonoBadge>
+              )}
+              {m.role === "admin" && <MonoBadge tone="saffron">admin</MonoBadge>}
+            </div>
+          ))}
+        </div>
+        <div className="border-t border-slate-200 bg-slate-50 px-4 py-2 text-[11px] text-slate-500">
+          Everyone who signs in creates an account here automatically. Signing up alone does not create a worker
+          listing — workers appear in the KYC Queue only after completing onboarding at /onboarding.
+        </div>
+      </Panel>
+    </div>
+  );
+}
 
 function StatTile({ icon, label, value, tone = "neutral" }: { icon: React.ReactNode; label: string; value: string; tone?: "neutral" | "ok" | "orange" }) {
   return (
