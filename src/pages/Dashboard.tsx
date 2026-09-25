@@ -26,6 +26,10 @@ import {
   Radar,
   Briefcase,
   HandHeart,
+  Bell,
+  UserPlus,
+  UserMinus,
+  CheckCheck,
 } from "lucide-react";
 
 const STATUS_TONE: Record<string, "neutral" | "ok" | "warn" | "saffron"> = {
@@ -44,9 +48,13 @@ export default function Dashboard() {
   const { isLoading: authLoading, signOut } = useAuth();
   const artisan = useQuery(api.artisans.getMyArtisan, {});
   const jobs = useQuery(api.bookings.listForWorker, {});
+  const notifications = useQuery(api.workerAdmin.myNotifications, {});
+  const unread = useQuery(api.workerAdmin.unreadCount, {});
+  const markAllRead = useMutation(api.workerAdmin.markAllRead);
   const setPresence = useMutation(api.artisans.setPresence);
   const acceptJob = useMutation(api.bookings.accept);
   const advance = useMutation(api.bookings.advance);
+  const [showNotifs, setShowNotifs] = useState(false);
 
   const [geoError, setGeoError] = useState<string | null>(null);
   const [toggling, setToggling] = useState(false);
@@ -258,6 +266,58 @@ export default function Dashboard() {
                 {online ? t("toggle_go_offline") : t("toggle_go_online")}
               </TlButton>
             </div>
+          )}
+        </div>
+
+        {/* Federation notification center */}
+        <div className="mt-6">
+          <button
+            type="button"
+            onClick={() => {
+              setShowNotifs((v) => !v);
+              if (!showNotifs && (unread ?? 0) > 0) void markAllRead({});
+            }}
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-xs transition hover:bg-slate-50"
+          >
+            <Bell className="size-4 text-emerald-600" />
+            Federation notices
+            {(unread ?? 0) > 0 && (
+              <span className="flex size-5 items-center justify-center rounded-full bg-rose-600 text-[10px] font-black text-white">
+                {unread}
+              </span>
+            )}
+          </button>
+          {showNotifs && (
+            <Panel title="Notices from the federation board" className="mt-3" bodyClassName="p-0">
+              <div className="max-h-[360px] overflow-y-auto">
+                {(notifications ?? []).length === 0 && (
+                  <p className="px-5 py-8 text-center text-xs text-slate-500">
+                    No notices yet — federation board updates about your
+                    membership will appear here.
+                  </p>
+                )}
+                {(notifications ?? []).map((n) => (
+                  <div key={n._id} className={`flex gap-3 border-b border-slate-100 px-4 py-3 last:border-0 ${!n.readAt ? "bg-emerald-50/40" : ""}`}>
+                    <span className={`mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-xl ${n.kind === "worker_removed" ? "bg-rose-50 text-rose-600" : "bg-emerald-50 text-emerald-700"}`}>
+                      {n.kind === "worker_removed" ? <UserMinus className="size-4" /> : <UserPlus className="size-4" />}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-bold text-slate-900">{n.title}</p>
+                      <p className="mt-0.5 text-[11px] leading-relaxed text-slate-600">{n.body}</p>
+                      <p className="mt-1 text-[10px] text-slate-400">
+                        {new Date(n.createdAt).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {(notifications ?? []).length > 0 && (
+                <div className="flex items-center justify-between border-t border-slate-200 bg-slate-50 px-4 py-2">
+                  <CheckCheck className="size-3.5 text-slate-400" />
+                  <span className="text-[10px] text-slate-400">Marked read on open</span>
+                </div>
+              )}
+            </Panel>
           )}
         </div>
 

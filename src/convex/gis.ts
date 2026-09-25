@@ -32,7 +32,8 @@ export const mapData = query({
     const userId = await requireUser(ctx);
     if (!(await isAdminUser(ctx, userId))) throw new Error("Forbidden");
 
-    const artisans = await ctx.db.query("artisans").collect();
+    const allArtisans = await ctx.db.query("artisans").collect();
+    const artisans = allArtisans.filter((a) => !a.removedAt);
     const bookings = await ctx.db.query("bookings").order("desc").take(400);
     const societies = await ctx.db.query("societies").take(200);
 

@@ -45,14 +45,16 @@ export const getMyArtisan = query({
 export const listArtisans = query({
   args: {},
   handler: async (ctx) => {
-    return await ctx.db.query("artisans").order("desc").take(50);
+    const all = await ctx.db.query("artisans").order("desc").take(200);
+    return all.filter((a) => !a.removedAt).slice(0, 50);
   },
 });
 
 export const federationStats = query({
   args: {},
   handler: async (ctx) => {
-    const artisans = await ctx.db.query("artisans").collect();
+    const all = await ctx.db.query("artisans").collect();
+    const artisans = all.filter((a) => !a.removedAt);
     const byTrade: Record<string, number> = {};
     let online = 0;
     let verified = 0;

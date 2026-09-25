@@ -247,7 +247,8 @@ export const overview = query({
     if (!(await isAdminUser(ctx, userId))) throw new Error("Forbidden");
 
     const bookings = await ctx.db.query("bookings").collect();
-    const artisans = await ctx.db.query("artisans").collect();
+    const allArtisans = await ctx.db.query("artisans").collect();
+    const artisans = allArtisans.filter((a) => !a.removedAt);
 
     const byStatus: Record<string, number> = {};
     let revenueSettled = 0;
@@ -298,6 +299,17 @@ export const workerDirectory = query({
     const userId = await requireUser(ctx);
     if (!(await isAdminUser(ctx, userId))) throw new Error("Forbidden");
     return await ctx.db.query("artisans").order("desc").take(200);
+  },
+});
+
+/** Removed workers for the admin console history view. */
+export const removedWorkers = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await requireUser(ctx);
+    if (!(await isAdminUser(ctx, userId))) throw new Error("Forbidden");
+    const all = await ctx.db.query("artisans").order("desc").take(200);
+    return all.filter((a) => !!a.removedAt);
   },
 });
 
@@ -365,6 +377,7 @@ export const reviewKyc = mutation({
     if (!(await isAdminUser(ctx, userId))) throw new Error("Forbidden");
     const artisan = await ctx.db.get(args.artisanId);
     if (!artisan) throw new Error("Artisan not found");
+    if (artisan.removedAt) throw new Error("This worker has been removed from the federation");
     if (artisan.kycStatus !== "pending") {
       throw new Error("This artisan's KYC is not pending review");
     }

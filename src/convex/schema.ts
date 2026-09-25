@@ -68,6 +68,11 @@ const schema = defineSchema(
       lng: v.optional(v.number()),
       telemetryAt: v.optional(v.number()), // last GPS ping
 
+      // Admin removal — soft-delete so history/ledger stay intact.
+      removedAt: v.optional(v.number()),
+      removedBy: v.optional(v.id("users")),
+      removalNote: v.optional(v.string()),
+
       // cooperative ledger (v1 display only)
       welfareBalance: v.number(),
       dividendBalance: v.number(),
@@ -188,6 +193,18 @@ const schema = defineSchema(
       lockedUntil: v.optional(v.number()),
       updatedAt: v.number(),
     }).index("by_key", ["key"]),
+
+    // Federation notifications — admin actions toward workers (add/remove etc.)
+    notifications: defineTable({
+      userId: v.id("users"), // recipient
+      kind: v.string(), // "worker_added" | "worker_removed" | "custom"
+      title: v.string(),
+      body: v.string(),
+      readAt: v.optional(v.number()),
+      createdAt: v.number(),
+    })
+      .index("by_user", ["userId"])
+      .index("by_user_read", ["userId", "readAt"]),
 
     // Dispute arbitration — double-blind flags from customers and workers
     disputes: defineTable({

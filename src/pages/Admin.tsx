@@ -1000,6 +1000,9 @@ function AuditPanel() {
 
 function MembersPanel() {
   const members = useQuery(api.admin.memberList, {});
+  const removedWorkers = useQuery(api.admin.removedWorkers, {});
+  const [addTarget, setAddTarget] = useState<{ _id: Id<"users">; email?: string; name?: string } | null>(null);
+  const [removing, setRemoving] = useState<{ artisanId: Id<"artisans">; name: string } | null>(null);
 
   if (members === undefined) return <LoadingPlaceholder text="Loading member registry…" />;
 
@@ -1038,11 +1041,29 @@ function MembersPanel() {
                 </p>
               </div>
               {m.workerId ? (
-                <MonoBadge tone={m.kycStatus === "verified" ? "ok" : "warn"}>
-                  worker · {m.workerTrade}
-                </MonoBadge>
+                <>
+                  <MonoBadge tone={m.kycStatus === "verified" ? "ok" : "warn"}>
+                    worker · {m.workerTrade}
+                  </MonoBadge>
+                  <button
+                    type="button"
+                    onClick={() => setRemoving({ artisanId: m.workerId!, name: m.workerName || m.name || m.email || "worker" })}
+                    className="rounded-xl border border-rose-200 bg-rose-50 px-2.5 py-1 text-[11px] font-bold text-rose-700 transition hover:bg-rose-100"
+                  >
+                    Remove
+                  </button>
+                </>
               ) : (
-                <MonoBadge tone="neutral">customer</MonoBadge>
+                <>
+                  <MonoBadge tone="neutral">customer</MonoBadge>
+                  <button
+                    type="button"
+                    onClick={() => setAddTarget({ _id: m._id, email: m.email, name: m.name })}
+                    className="flex items-center gap-1 rounded-xl border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-700 transition hover:bg-emerald-100"
+                  >
+                    <UserPlus className="size-3" /> Add as worker
+                  </button>
+                </>
               )}
               {m.role === "admin" && <MonoBadge tone="saffron">admin</MonoBadge>}
             </div>
@@ -1050,9 +1071,215 @@ function MembersPanel() {
         </div>
         <div className="border-t border-slate-200 bg-slate-50 px-4 py-2 text-[11px] text-slate-500">
           Everyone who signs in creates an account here automatically. Signing up alone does not create a worker
-          listing — workers appear in the KYC Queue only after completing onboarding at /onboarding.
+          listing — use “Add as worker” to register a member, or complete onboarding at /onboarding. Removed workers
+          appear below with their removal note; the worker is notified in their hub either way.
         </div>
       </Panel>
+
+      {removedWorkers && removedWorkers.length > 0 && (
+        <Panel title={`Removed workers (${removedWorkers.length})`} bodyClassName="p-0">
+          <div className="max-h-[300px] overflow-y-auto">
+            {removedWorkers.map((w) => (
+              <div key={w._id} className="flex items-center gap-3 border-b border-slate-100 px-4 py-3 last:border-0">
+                <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-rose-50 text-[11px] font-black uppercase text-rose-600">
+                  {w.fullName.charAt(0)}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-xs font-bold text-slate-900">{w.fullName} · {w.trade}</p>
+                  <p className="truncate text-[11px] text-slate-500">
+                    Removed {w.removedAt ? new Date(w.removedAt).toLocaleDateString("en-IN", { dateStyle: "medium" }) : ""} · {w.removalNote || "No note"}
+                  </p>
+                </div>
+                <MonoBadge tone="neutral">removed</MonoBadge>
+              </div>
+            ))}
+          </div>
+        </Panel>
+      )}
+
+      {addTarget && (
+        <AddWorkerDialog
+          target={addTarget}
+          onClose={() => setAddTarget(null)}
+          onDone={() => setAddTarget(null)}
+        />
+      )}
+      {removing && (
+        <RemoveWorkerDialog
+          target={removing}
+          onClose={() => setRemoving(null)}
+          onDone={() => setRemoving(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+/* ── Add worker dialog (admin registers a member as worker + notifies) ── */
+
+const TRADE_OPTIONS = ["electrician", "plumber", "carpenter", "mason", "painter", "appliance"];
+
+function AddWorkerDialog({
+  target,
+  onClose,
+  onDone,
+}: {
+  target: { _id: Id<"users">; email?: string; name?: string };
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  const addWorker = useMutation(api.workerAdmin.addWorker);
+  const [fullName, setFullName] = useState(target.name || target.email?.split("@")[0] || "");
+  const [phone, setPhone] = useState("");
+  const [trade, setTrade] = useState(TRADE_OPTIONS[0]);
+  const [district, setDistrict] = useState("");
+  const [state, setState] = useState("Andhra Pradesh");
+  const [experienceYears, setExperienceYears] = useState(1);
+  const [dailyRate, setDailyRate] = useState(500);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function submit() {
+    setBusy(true);
+    setError(null);
+    try {
+      await addWorker({
+        userId: target._id,
+        fullName,
+        phone,
+        trade,
+        district,
+        state,
+        experienceYears,
+        dailyRate,
+      });
+      onDone();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to add worker");
+      setBusy(false);
+    }
+  }
+
+  const valid = fullName.trim().length > 1 && phone.trim().length >= 10 && district.trim().length > 1;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white shadow-2xl">
+        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-3.5">
+          <div className="flex items-center gap-2">
+            <span className="flex size-8 items-center justify-center rounded-xl bg-emerald-600 text-white"><UserPlus className="size-4" /></span>
+            <div>
+              <h2 className="text-sm font-extrabold text-slate-900">Register member as worker</h2>
+              <p className="text-[11px] text-slate-500">{target.email || target.name} — they'll be notified in their hub</p>
+            </div>
+          </div>
+          <button type="button" onClick={onClose} className="flex size-8 items-center justify-center rounded-xl border border-slate-200 text-slate-400 transition hover:bg-slate-50 hover:text-slate-600">✕</button>
+        </div>
+        <div className="space-y-3 px-5 py-4">
+          <Field label="Full name" value={fullName} onChange={setFullName} placeholder="e.g. Ramesh Kumar" />
+          <Field label="Phone" value={phone} onChange={setPhone} placeholder="10-digit mobile" />
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-0.5 block text-[10px] font-bold uppercase tracking-wider text-slate-400">Trade</label>
+              <select value={trade} onChange={(e) => setTrade(e.target.value)} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 transition focus:border-emerald-500 focus:bg-white focus:outline-none">
+                {TRADE_OPTIONS.map((t) => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
+            <Field label="District" value={district} onChange={setDistrict} placeholder="e.g. Kurnool" />
+          </div>
+          <div>
+            <label className="mb-0.5 block text-[10px] font-bold uppercase tracking-wider text-slate-400">State</label>
+            <select value={state} onChange={(e) => setState(e.target.value)} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 transition focus:border-emerald-500 focus:bg-white focus:outline-none">
+              {["Andhra Pradesh", "Telangana", "Karnataka", "Tamil Nadu", "Kerala", "Maharashtra", "Delhi", "West Bengal", "Uttar Pradesh", "Gujarat", "Rajasthan"].map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-0.5 block text-[10px] font-bold uppercase tracking-wider text-slate-400">Experience (years)</label>
+              <input type="number" min={0} max={60} value={experienceYears} onChange={(e) => setExperienceYears(Number(e.target.value))} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 transition focus:border-emerald-500 focus:bg-white focus:outline-none" />
+            </div>
+            <div>
+              <label className="mb-0.5 block text-[10px] font-bold uppercase tracking-wider text-slate-400">Daily rate (₹)</label>
+              <input type="number" min={0} step={50} value={dailyRate} onChange={(e) => setDailyRate(Number(e.target.value))} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 transition focus:border-emerald-500 focus:bg-white focus:outline-none" />
+            </div>
+          </div>
+          {error && <p className="text-xs font-semibold text-rose-600">{error}</p>}
+          <button type="button" disabled={!valid || busy} onClick={() => void submit()} className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-emerald-700 active:scale-95 disabled:opacity-50">
+            {busy && <Loader2 className="size-4 animate-spin" />}
+            Add worker &amp; send notification
+          </button>
+          <p className="text-center text-[10px] text-slate-400">KYC starts as pending — the worker completes verification and the skill quiz in their hub.</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Remove worker dialog (soft delete + notification) ── */
+
+function RemoveWorkerDialog({
+  target,
+  onClose,
+  onDone,
+}: {
+  target: { artisanId: Id<"artisans">; name: string };
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  const removeWorker = useMutation(api.workerAdmin.removeWorker);
+  const [note, setNote] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function submit() {
+    setBusy(true);
+    setError(null);
+    try {
+      await removeWorker({ artisanId: target.artisanId, note });
+      onDone();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to remove worker");
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white shadow-2xl">
+        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-3.5">
+          <div className="flex items-center gap-2">
+            <span className="flex size-8 items-center justify-center rounded-xl bg-rose-600 text-white"><XCircle className="size-4" /></span>
+            <div>
+              <h2 className="text-sm font-extrabold text-slate-900">Remove worker from federation</h2>
+              <p className="text-[11px] text-slate-500">{target.name} — they'll be notified with your reason</p>
+            </div>
+          </div>
+          <button type="button" onClick={onClose} className="flex size-8 items-center justify-center rounded-xl border border-slate-200 text-slate-400 transition hover:bg-slate-50 hover:text-slate-600">✕</button>
+        </div>
+        <div className="space-y-3 px-5 py-4">
+          <div>
+            <label className="mb-0.5 block text-[10px] font-bold uppercase tracking-wider text-slate-400">Reason (sent to the worker)</label>
+            <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={3} placeholder="e.g. Repeated quality complaints from customers" className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 transition placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20" />
+          </div>
+          <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] font-semibold text-amber-800">
+            Their profile is deactivated (off the dispatch radar and public directory), any active jobs are cancelled, and booking history is preserved.
+          </p>
+          {error && <p className="text-xs font-semibold text-rose-600">{error}</p>}
+          <button type="button" disabled={busy} onClick={() => void submit()} className="flex w-full items-center justify-center gap-2 rounded-xl bg-rose-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-rose-700 active:scale-95 disabled:opacity-50">
+            {busy && <Loader2 className="size-4 animate-spin" />}
+            Remove worker &amp; send notification
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Field({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string }) {
+  return (
+    <div>
+      <label className="mb-0.5 block text-[10px] font-bold uppercase tracking-wider text-slate-400">{label}</label>
+      <input value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 transition placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20" />
     </div>
   );
 }
