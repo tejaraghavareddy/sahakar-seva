@@ -1,5 +1,7 @@
 import { useMemo, useState } from "react";
+import { useQuery } from "convex/react";
 import { Link } from "react-router";
+import { api } from "@/convex/_generated/api";
 import { useLang } from "@/lib/i18n";
 import { SERVICES, TRADES, COLOR_SOFT } from "@/lib/trades";
 import { AppHeader } from "@/components/AppHeader";
@@ -21,15 +23,6 @@ import {
 
 type Tab = "artisans" | "radar" | "orders";
 
-/** Pinned service coordinates per trade so proximity distances are realistic. */
-const TRADE_PINS: Record<string, [number, number]> = {
-  electrician: [17.3969, 78.4383],
-  plumber: [17.4239, 78.4521],
-  carpenter: [17.4092, 78.5004],
-  mason: [17.3602, 78.5211],
-  painter: [17.4126, 78.4192],
-  appliance: [17.3701, 78.4703],
-};
 const EMERGENCY_RADIUS_M = 3000;
 
 export default function Services() {
@@ -41,12 +34,32 @@ export default function Services() {
   const [emergencyMode, setEmergencyMode] = useState(false);
   const { location, detect } = useDetectedLocation();
 
+  const artisans = useQuery(api.artisans.listArtisans, {});
+
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
+    // Live availability per trade from actual registered artisans — never demo
+    // pins, so distance/ETA pills only appear when real workers exist.
+    const byTrade = new Map<string, { count: number; nearestM: number | null }>();
+    for (const a of artisans ?? []) {
+      if (a.kycStatus !== "verified") continue;
+      const e = byTrade.get(a.trade) ?? { count: 0, nearestM: null };
+      e.count += 1;
+      if (typeof a.lat === "number" && typeof a.lng === "number") {
+        const d = haversine(location.lat, location.lng, a.lat, a.lng);
+        if (e.nearestM === null || d < e.nearestM) e.nearestM = d;
+      }
+      byTrade.set(a.trade, e);
+    }
     let list = SERVICES.map((s) => {
-      const pin = TRADE_PINS[s.trade];
-      const dist = pin ? haversine(location.lat, location.lng, pin[0], pin[1]) : null;
-      return { ...s, distM: dist, etaM: dist !== null ? estimateEtaMinutes(dist) : null };
+      const avail = byTrade.get(s.trade);
+      const dist = artisans ? (avail?.nearestM ?? null) : null;
+      return {
+        ...s,
+        artisanCount: artisans ? (avail?.count ?? 0) : null,
+        distM: dist,
+        etaM: dist !== null ? estimateEtaMinutes(dist) : null,
+      };
     }).filter((s) => {
       const inTrade = trade === "all" || s.trade === trade;
       const inSearch =
@@ -65,7 +78,7 @@ export default function Services() {
       );
     }
     return list;
-  }, [q, trade, location, sortByDistance, emergencyMode]);
+  }, [q, trade, location, sortByDistance, emergencyMode, artisans]);
 
   const nearest = filtered.length > 0 ? filtered[0] : null;
 
@@ -276,11 +289,22 @@ export default function Services() {
                         <h2 className="mt-3.5 text-sm font-bold text-slate-900">
                           {s.name}
                         </h2>
-                        {s.distM !== null && (
+                        {(s.artisanCount ?? 0) === 0 && (
+                          <p className="mt-1 inline-flex w-fit items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-bold text-slate-500">
+                            <Navigation className="size-2.5" />
+                            No verified {s.trade} artisans yet
+                          </p>
+                        )}
+                        {(s.artisanCount ?? 0) > 0 && s.distM !== null && (
                           <p className="mt-1 inline-flex w-fit items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
                             <Navigation className="size-2.5" />
-                            {formatDistance(s.distM!)} away · ~{s.etaM} min
-                            arrival
+                            {s.artisanCount} {s.artisanCount === 1 ? "artisan" : "artisans"} nearby · {formatDistance(s.distM!)} away · ~{s.etaM} min arrival
+                          </p>
+                        )}
+                        {(s.artisanCount ?? 0) > 0 && s.distM === null && (
+                          <p className="mt-1 inline-flex w-fit items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
+                            <Navigation className="size-2.5" />
+                            {s.artisanCount} verified {s.artisanCount === 1 ? "artisan" : "artisans"} available
                           </p>
                         )}
                         <p className="tl-line-clamp-2 mt-1 text-sm leading-6 text-slate-500 italic">
