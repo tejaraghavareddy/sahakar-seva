@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { HardHat } from "lucide-react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
@@ -8,16 +8,8 @@ import { useLang } from "@/lib/i18n";
 import {
   SOCIETIES,
   TRADES,
-  QUIZ,
-  QUIZ_PASS_MARK,
   type TradeId,
 } from "@/lib/trades";
-import {
-  speak,
-  stopSpeaking,
-  sttSupported,
-  createRecognition,
-} from "@/lib/speech";
 import {
   LanguagePicker,
   MonoBadge,
@@ -29,15 +21,12 @@ import {
 import { IdCardDialog } from "@/components/IdCardDialog";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  ArrowLeft,
   ArrowRight,
   BadgeCheck,
   Check,
   HandHeart,
   Loader2,
-  Mic,
   ShieldCheck,
-  Volume2,
 } from "lucide-react";
 
 type Step = 1 | 2 | 3 | 4;
@@ -74,7 +63,7 @@ const EMPTY_FORM: ProfileForm = {
 type TT = (k: string, vars?: Record<string, string | number>) => string;
 
 export default function Onboarding() {
-  const { t, speechLang } = useLang();
+  const { t } = useLang();
   const artisan = useQuery(api.artisans.getMyArtisan, {});
   const saveProfile = useMutation(api.artisans.saveProfile);
   const navigate = useNavigate();
@@ -321,10 +310,9 @@ export default function Onboarding() {
                 exit={{ opacity: 0, x: -24 }}
                 transition={{ duration: 0.22 }}
               >
-                <StepQuiz
+                <StepSkill
                   artisan={artisan}
-                  speechLang={speechLang}
-                  onPassed={() => setStep(4)}
+                  onNext={() => setStep(4)}
                   t={t}
                 />
               </motion.div>
@@ -604,268 +592,89 @@ function StepKyc({
   );
 }
 
-/* ══════════ STEP 3 — Voice skill quiz ══════════ */
+/* ══════════ STEP 3 — Skill confirmation ══════════ */
 
-function StepQuiz({
+function StepSkill({
   artisan,
-  speechLang,
-  onPassed,
+  onNext,
   t,
 }: {
   artisan: ArtisanDoc;
-  speechLang: string;
-  onPassed: () => void;
+  onNext: () => void;
   t: TT;
 }) {
-  const submitQuiz = useMutation(api.artisans.submitQuiz);
-  const questions = useMemo(
-    () => QUIZ[artisan.trade as TradeId] ?? [],
-    [artisan.trade],
-  );
-  const [idx, setIdx] = useState(0);
-  const [answers, setAnswers] = useState<number[]>([]);
-  const [heard, setHeard] = useState<string | null>(null);
-  const [listening, setListening] = useState(false);
-  const [micError, setMicError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-  const [quizError, setQuizError] = useState<string | null>(null);
-  const spokenIdxRef = useRef<number | null>(null);
+  const confirmSkill = useMutation(api.artisans.confirmSkill);
+  const [confirming, setConfirming] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const trade = artisan.trade;
 
-  const q = questions[idx];
-  const total = questions.length;
-  const stt = sttSupported();
-
-  /* Auto read-aloud each question when it appears (options only — never the answer). */
-  useEffect(() => {
-    if (!q) return;
-    speak(spokenQuestion(idx, q.options), speechLang);
-    spokenIdxRef.current = idx;
-    return () => stopSpeaking();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [idx, artisan.trade]);
-
-  function handleSelect(optionIdx: number) {
-    setAnswers((a) => {
-      const next = [...a];
-      next[idx] = optionIdx;
-      return next;
-    });
-  }
-
-  function startListening() {
-    if (listening) return;
-    setListening(true);
-    setHeard(null);
-    setMicError(null);
-    createRecognition(
-      speechLang,
-      (transcript) => {
-        setHeard(transcript);
-        matchVoice(transcript, q.options, setAnswers, idx);
-      },
-      () => setListening(false),
-      () => {
-        setListening(false);
-        setMicError(t("quiz_mic_unsupported"));
-      },
-    );
-  }
-
-  async function handleSubmit() {
-    // Hole-aware guard: answers is sparse, so filter() would skip unanswered
-    // slots. Index access returns undefined for holes — check every question.
-    if (questions.some((_, i) => answers[i] === undefined)) {
-      setQuizError(t("quiz_error"));
-      return;
-    }
-    setSubmitting(true);
-    setQuizError(null);
+  async function handleConfirm() {
+    setConfirming(true);
+    setError(null);
     try {
-      const correct = questions.reduce(
-        (acc, qq, i) => acc + (answers[i] === qq.answer ? 1 : 0),
-        0,
-      );
-      const score = Math.round((correct / total) * 100);
-      const result = await submitQuiz({ score });
-      if (!result.ok) {
-        // Normal re-attempt outcome — show the message, stay on the quiz.
-        setQuizError(result.message ?? t("quiz_error"));
-        return;
-      }
-      stopSpeaking();
-      onPassed();
+      await confirmSkill({});
+      onNext();
     } catch (e) {
-      // Strip Convex transport prefixes so users see a readable message.
       const raw = e instanceof Error ? e.message : "";
-      setQuizError(raw.replace(/^\[CONVEX[^\]]*\]\s*/, "") || t("quiz_error"));
-    } finally {
-      setSubmitting(false);
+      setError(raw.replace(/^\[CONVEX[^\]]*\]\s*/, "") || "Could not issue the credential. Please try again.");
+      setConfirming(false);
     }
   }
-
-  if (!q) return null;
 
   return (
     <Panel tag="step 3/4">
-      <p className="text-sm text-slate-600">
-        {t("quiz_sub", { pass: QUIZ_PASS_MARK })}
-      </p>
+      <div className="flex flex-col items-center py-6 text-center">
+        <span className="flex size-14 items-center justify-center rounded-2xl border border-emerald-200 bg-emerald-50">
+          <ShieldCheck className="size-7 text-emerald-700" />
+        </span>
+        <h3 className="mt-4 text-lg font-extrabold text-slate-900">
+          {t("skill_title")}
+        </h3>
+        <p className="mt-1 max-w-md text-sm leading-6 text-slate-600">
+          {t("skill_desc", { trade })}
+        </p>
 
-      {/* Progress dots */}
-      <div className="mt-4 flex gap-1.5">
-        {questions.map((_, i) => (
-          <span
-            key={i}
-            className={`h-1.5 flex-1 rounded-full ${
-              answers[i] !== undefined
-                ? "bg-emerald-600"
-                : i === idx
-                  ? "bg-emerald-800"
-                  : "bg-slate-200"
-            }`}
-          />
-        ))}
-      </div>
-
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={idx}
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -10 }}
-          transition={{ duration: 0.18 }}
-          className="mt-5"
-        >
-          <div className="flex items-center justify-between">
-            <span className="tl-label">
-              {t("quiz_q", { n: idx + 1, total })}
+        <div className="mt-5 w-full max-w-sm space-y-2 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-left text-xs">
+          <div className="flex items-start gap-2">
+            <Check className="mt-0.5 size-3.5 shrink-0 text-emerald-600" />
+            <span className="text-slate-700">
+              I work as a <b>{trade}</b> and my profile details are accurate.
             </span>
-            <button
-              type="button"
-              onClick={() => {
-                if (spokenIdxRef.current === idx) {
-                  stopSpeaking();
-                  spokenIdxRef.current = null;
-                } else {
-                  speak(spokenQuestion(idx, q.options), speechLang);
-                  spokenIdxRef.current = idx;
-                }
-              }}
-              className="tl-icon-btn"
-              title={t("quiz_speak")}
-            >
-              <Volume2 className="size-4" />
-            </button>
           </div>
-
-          {/* Pictorial question */}
-          <div className="mt-3 flex flex-col items-center rounded-2xl border border-slate-200 bg-slate-50 py-6">
-            <q.icon className="size-12 text-emerald-800" strokeWidth={1.5} />
+          <div className="flex items-start gap-2">
+            <Check className="mt-0.5 size-3.5 shrink-0 text-emerald-600" />
+            <span className="text-slate-700">
+              I can attend service calls in my district and will keep my
+              availability status up to date.
+            </span>
           </div>
-
-          <div className="mt-4 grid gap-2 sm:grid-cols-2">
-            {q.options.map((opt, i) => {
-              const selected = answers[idx] === i;
-              return (
-                <button
-                  type="button"
-                  key={i}
-                  onClick={() => handleSelect(i)}
-                  className={`flex items-center gap-2.5 rounded-xl border px-3.5 py-3 text-left text-xs font-semibold transition ${
-                    selected
-                      ? "border-emerald-600 bg-emerald-50 text-emerald-800"
-                      : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-                  }`}
-                >
-                  <span
-                    className={`flex size-5 shrink-0 items-center justify-center rounded-full border text-[10px] font-bold ${
-                      selected
-                        ? "border-emerald-600 bg-emerald-600 text-white"
-                        : "border-slate-200 text-slate-400"
-                    }`}
-                  >
-                    {String.fromCharCode(65 + i)}
-                  </span>
-                  {opt}
-                </button>
-              );
-            })}
+          <div className="flex items-start gap-2">
+            <Check className="mt-0.5 size-3.5 shrink-0 text-emerald-600" />
+            <span className="text-slate-700">
+              I will follow the federation code of conduct — fair rates,
+              quality work and respectful conduct with customers.
+            </span>
           </div>
-
-          {/* Voice answer */}
-          <div className="mt-4 flex flex-col items-center gap-2">
-            <button
-              type="button"
-              disabled={!stt}
-              onClick={startListening}
-              className={`flex size-12 items-center justify-center rounded-full border transition ${
-                listening
-                  ? "border-amber-400 bg-amber-100 text-amber-700 tl-blink"
-                  : "border-emerald-600 bg-emerald-600 text-white hover:bg-emerald-700"
-              } ${!stt ? "opacity-40" : ""}`}
-            >
-              <Mic className="size-5" />
-            </button>
-            <p className="text-[11px] text-slate-500">
-              {listening ? t("quiz_listening") : t("quiz_mic")}
-            </p>
-            {heard && (
-              <p className="text-[11px] font-semibold text-emerald-700">
-                {t("quiz_heard", { text: heard })}
-              </p>
-            )}
-            {micError && (
-              <p className="text-[11px] font-semibold text-amber-700">
-                {micError}
-              </p>
-            )}
-          </div>
-        </motion.div>
-      </AnimatePresence>
-
-      <div className="mt-6 flex items-center justify-between border-t border-border pt-4">
-        <TlButton
-          variant="ghost"
-          disabled={idx === 0}
-          onClick={() => setIdx((i) => i - 1)}
-        >
-          <ArrowLeft className="size-4" />
-          {t("btn_back")}
-        </TlButton>
-        {idx < total - 1 ? (
-          <TlButton
-            disabled={answers[idx] === undefined}
-            onClick={() => setIdx((i) => i + 1)}
-          >
-            {t("quiz_next")}
-            <ArrowRight className="size-4" />
-          </TlButton>
-        ) : (
-          <TlButton
-            variant="ok"
-            disabled={answers.filter((_, i) => i < total).some((a) => a === undefined)}
-            onClick={handleSubmit}
-          >
-            {submitting ? (
-              <>
-                <Loader2 className="size-4 animate-spin" />
-                {t("quiz_scoring")}
-              </>
-            ) : (
-              <>
-                <Check className="size-4" />
-                {t("quiz_submit")}
-              </>
-            )}
-          </TlButton>
-        )}
-      </div>
-
-      {quizError && (
-        <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">
-          {quizError}
         </div>
-      )}
+
+        {error && (
+          <div className="mt-3 w-full max-w-sm rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">
+            {error}
+          </div>
+        )}
+        <TlButton className="mt-6" disabled={confirming} onClick={() => void handleConfirm()}>
+          {confirming ? (
+            <Loader2 className="size-4 animate-spin" />
+          ) : (
+            <Check className="size-4" />
+          )}
+          {t("skill_confirm")}
+          <ArrowRight className="size-4" />
+        </TlButton>
+        <p className="mt-3 text-[10px] text-slate-400">
+          {t("skill_note")}
+        </p>
+      </div>
     </Panel>
   );
 }
@@ -924,40 +733,9 @@ function StepCredential({
 
 /* ── helpers ── */
 
-/** Builds the spoken form of a question: "Question 2. A. … B. … C. … D. …" */
-function spokenQuestion(idx: number, options: string[]): string {
-  const list = options
-    .map((opt, i) => `${String.fromCharCode(65 + i)}. ${opt}`)
-    .join(". ");
-  return `Question ${idx + 1}. ${list}`;
-}
 
-function matchVoice(
-  transcript: string,
-  options: string[],
-  setAnswers: (fn: (a: number[]) => number[]) => void,
-  idx: number,
-) {
-  const norm = (s: string) =>
-    s.toLowerCase().replace(/[^\p{L}\p{N} ]/gu, "").trim();
-  const heardNorm = norm(transcript);
-  let best = -1;
-  let bestLen = 0;
-  options.forEach((opt, i) => {
-    const optNorm = norm(opt);
-    if (heardNorm.includes(optNorm) && optNorm.length > bestLen) {
-      best = i;
-      bestLen = optNorm.length;
-    }
-  });
-  if (best >= 0) {
-    setAnswers((a) => {
-      const next = [...a];
-      next[idx] = best;
-      return next;
-    });
-  }
-}
+
+
 
 function Field({
   label,
