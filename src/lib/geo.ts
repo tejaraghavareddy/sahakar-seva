@@ -106,27 +106,73 @@ export function getAccuratePosition(timeoutMs = 12000): Promise<GeolocationPosit
 export const HYD_CENTER = [17.385, 78.4867] as const;
 export const DEFAULT_ZOOM = 13;
 
-/** Reverse geocode coordinates via Nominatim (OSM). */
+export interface ReverseGeocodeResult {
+  /** Full detailed one-line address, most specific part first. */
+  address: string;
+  /** Named POI/feature the point sits on (e.g. a landmark or building). */
+  landmark?: string;
+  /** Street / road name. */
+  road?: string;
+  /** Neighbourhood / suburb / quarter. */
+  area?: string;
+  /** Village or hamlet. */
+  village?: string;
+  /** City or town. */
+  city?: string;
+  /** District (county / state_district). */
+  district?: string;
+  /** State. */
+  state?: string;
+  /** Postal (PIN) code. */
+  pincode?: string;
+}
+
+/**
+ * Reverse geocode coordinates via Nominatim (OSM), returning a detailed
+ * structured address: landmark, street, area, village, town/city, district,
+ * state and PIN code whenever OSM has them tagged.
+ */
 export async function reverseGeocode(
   lat: number,
   lng: number,
-): Promise<{ address: string; locality?: string; city?: string; pincode?: string }> {
+): Promise<ReverseGeocodeResult> {
+  const fallback = { address: `${lat.toFixed(5)}, ${lng.toFixed(5)}` };
   try {
     const res = await fetch(
-      `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&zoom=19&addressdetails=1`,
+      `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1&namedetails=1`,
       { headers: { "User-Agent": "SahakarSeva/1.0 (cooperative-gis)" } },
     );
+    if (!res.ok) return fallback;
     const data = await res.json();
     const a = data.address ?? {};
-    const parts = [a.road, a.neighbourhood, a.suburb, a.city || a.town, a.state, a.postcode].filter(Boolean);
+
+    const landmark = (data.name || data.namedetails?.name || "").trim() || undefined;
+    const road = a.road || a.pedestrian || a.footway || undefined;
+    const area = a.neighbourhood || a.suburb || a.quarter || a.city_district || undefined;
+    const village = a.village || a.hamlet || undefined;
+    const city = a.city || a.town || a.municipality || undefined;
+    const district = a.county || a.state_district || a.district || undefined;
+    const state = a.state || undefined;
+    const pincode = a.postcode || undefined;
+
+    // Build the one-line label without duplicate segments.
+    const seen = new Set<string>();
+    const parts = [
+      landmark, road, area, village, city, district, state, pincode,
+    ].filter((p): p is string => {
+      if (!p) return false;
+      const k = p.toLowerCase();
+      if (seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    });
+
     return {
-      address: parts.join(", ") || data.display_name || `${lat.toFixed(5)}, ${lng.toFixed(5)}`,
-      locality: a.neighbourhood || a.suburb,
-      city: a.city || a.town,
-      pincode: a.postcode,
+      address: parts.length > 0 ? parts.join(", ") : fallback.address,
+      landmark, road, area, village, city, district, state, pincode,
     };
   } catch {
-    return { address: `${lat.toFixed(5)}, ${lng.toFixed(5)}` };
+    return fallback;
   }
 }
 

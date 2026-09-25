@@ -1,11 +1,17 @@
 import { useCallback, useEffect, useState } from "react";
-import { getAccuratePosition } from "@/lib/geo";
+import { getAccuratePosition, reverseGeocode } from "@/lib/geo";
 
 export interface DetectedLocation {
   label: string;
   lat: number;
   lng: number;
   accuracy?: number;
+  /** Structured address parts from reverse geocoding (best effort). */
+  area?: string;
+  city?: string;
+  district?: string;
+  state?: string;
+  pincode?: string;
 }
 
 const KEY = "ss_location_v1";
@@ -25,20 +31,6 @@ export function readStoredLocation(): DetectedLocation {
     /* ignore */
   }
   return FALLBACK;
-}
-
-async function reverseGeocode(lat: number, lng: number): Promise<string | null> {
-  try {
-    const res = await fetch(
-      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=16`,
-      { headers: { Accept: "application/json" } },
-    );
-    if (!res.ok) return null;
-    const data = (await res.json()) as { display_name?: string };
-    return data.display_name ?? null;
-  } catch {
-    return null;
-  }
 }
 
 function persist(loc: DetectedLocation) {
@@ -61,14 +53,19 @@ export function useDetectedLocation() {
     getAccuratePosition(10000)
       .then(async (pos) => {
         const { latitude, longitude, accuracy } = pos.coords;
-        const label = await reverseGeocode(latitude, longitude);
+        const g = await reverseGeocode(latitude, longitude);
         const next: DetectedLocation = {
           label:
-            label ??
+            g.address ||
             `${latitude.toFixed(5)}° N, ${longitude.toFixed(5)}° E`,
           lat: latitude,
           lng: longitude,
           accuracy: Math.round(accuracy),
+          area: g.area,
+          city: g.city,
+          district: g.district,
+          state: g.state,
+          pincode: g.pincode,
         };
         persist(next);
         setLocation(next);

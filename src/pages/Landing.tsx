@@ -251,6 +251,11 @@ export default function Landing() {
             label: loc.address || location.label,
             lat: loc.lat,
             lng: loc.lng,
+            area: loc.geo?.area,
+            city: loc.geo?.city,
+            district: loc.geo?.district,
+            state: loc.geo?.state,
+            pincode: loc.geo?.pincode,
           });
           setShowMap(false);
         }}

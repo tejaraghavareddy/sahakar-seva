@@ -109,6 +109,11 @@ export function AppHeader() {
             label: loc.address,
             lat: loc.lat,
             lng: loc.lng,
+            area: loc.geo?.area,
+            city: loc.geo?.city,
+            district: loc.geo?.district,
+            state: loc.geo?.state,
+            pincode: loc.geo?.pincode,
           });
           setPickerOpen(false);
         }}

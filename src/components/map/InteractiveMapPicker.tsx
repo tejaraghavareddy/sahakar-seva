@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { ReverseGeocodeResult } from "@/lib/geo";
 import { MapContainer, TileLayer, Marker, useMap, useMapEvents } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -34,6 +35,8 @@ export interface PickedLocation {
   lat: number;
   lng: number;
   address: string;
+  /** Structured parts, present when reverse geocoding succeeded. */
+  geo?: ReverseGeocodeResult;
 }
 
 interface InteractiveMapPickerProps {
@@ -82,7 +85,7 @@ export default function InteractiveMapPicker({
 
   const [lat, setLat] = useState(center[0]);
   const [lng, setLng] = useState(center[1]);
-  const [address, setAddress] = useState("");
+  const [geo, setGeo] = useState<ReverseGeocodeResult | null>(null);
   const [gpsLoading, setGpsLoading] = useState(false);
   const [gpsAcc, setGpsAcc] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -95,7 +98,7 @@ export default function InteractiveMapPicker({
 
   const reverse = useCallback(async (a: number, b: number) => {
     const result = await reverseGeocode(a, b);
-    setAddress(result.address);
+    setGeo(result);
   }, []);
 
   const handleMoveEnd = useCallback(
@@ -175,7 +178,7 @@ export default function InteractiveMapPicker({
   }
 
   function handleConfirm() {
-    onPick({ lat, lng, address });
+    onPick({ lat, lng, address: geo?.address ?? `${lat.toFixed(5)}, ${lng.toFixed(5)}`, geo: geo ?? undefined });
   }
 
   return (
@@ -286,10 +289,34 @@ export default function InteractiveMapPicker({
         </div>
       </div>
 
-      {/* Address + confirm */}
-      {address && (
-        <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
-          <span className="font-bold text-slate-900">Address:</span> {address}
+      {/* Detailed address breakdown + confirm */}
+      {geo && (
+        <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+          <p className="text-xs font-bold text-slate-900">
+            {geo.landmark || geo.road || geo.area || "Selected location"}
+          </p>
+          {geo.address && (
+            <p className="mt-0.5 text-[11px] leading-relaxed text-slate-600">
+              {geo.address}
+            </p>
+          )}
+          <div className="mt-1.5 flex flex-wrap gap-1">
+            {[
+              ["Area", geo.area],
+              ["Village", geo.village],
+              ["City", geo.city],
+              ["District", geo.district],
+              ["State", geo.state],
+              ["PIN", geo.pincode],
+            ].filter(([, v]) => !!v).map(([k, v]) => (
+              <span
+                key={k as string}
+                className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-semibold text-slate-700"
+              >
+                {k}: {v}
+              </span>
+            ))}
+          </div>
         </div>
       )}
 
