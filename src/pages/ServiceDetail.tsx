@@ -2,7 +2,7 @@ import { Link, useNavigate, useParams } from "react-router";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useLang } from "@/lib/i18n";
-import { getService, getTrade, COLOR_SOFT } from "@/lib/trades";
+import { getService, getTrade, COLOR_SOFT, isCustomServiceId, listingAsService } from "@/lib/trades";
 import { AppHeader } from "@/components/AppHeader";
 import { Panel, SectionHeader, TlButton, StatusDot } from "@/components/terminal";
 import { RevenueSplitBar } from "@/components/RevenueSplit";
@@ -10,6 +10,7 @@ import {
   ArrowLeft,
   ArrowRight,
   Clock,
+  Loader2,
   Zap,
   ShieldCheck,
   ListChecks,
@@ -20,6 +21,13 @@ export default function ServiceDetail() {
   const { t } = useLang();
   const navigate = useNavigate();
   const svc = getService(id ?? "");
+  // A worker-created listing is addressed as `cs_<id>`; it is only bookable
+  // once the board approved it, so an unapproved id reads as "not found".
+  const custom = useQuery(api.customServices.approvedByRouteId, {
+    serviceId: isCustomServiceId(id ?? "") ? (id as string) : "none",
+  });
+  const listing = custom ?? null;
+  const shown = svc ?? (listing ? listingAsService(listing) : undefined);
 
   const stats = useQuery(api.artisans.federationStats, {}) ?? {
     total: 0,
@@ -28,7 +36,14 @@ export default function ServiceDetail() {
     byTrade: {},
   };
 
-  if (!svc) {
+  if (!shown) {
+    if (isCustomServiceId(id ?? "") && custom === undefined) {
+      return (
+        <div className="flex min-h-screen items-center justify-center">
+          <Loader2 className="size-6 animate-spin text-slate-400" />
+        </div>
+      );
+    }
     return (
       <div className="min-h-screen">
         <AppHeader />
@@ -42,10 +57,10 @@ export default function ServiceDetail() {
     );
   }
 
-  const trade = getTrade(svc.trade);
+  const trade = getTrade(shown.trade);
   const TradeIcon = trade?.icon;
-  const soft = COLOR_SOFT[svc.color] ?? COLOR_SOFT.ok;
-  const workersForTrade = stats.byTrade?.[svc.trade] ?? 0;
+  const soft = COLOR_SOFT[shown.color] ?? COLOR_SOFT.ok;
+  const workersForTrade = stats.byTrade?.[shown.trade] ?? 0;
 
   return (
     <div className="min-h-screen">
@@ -71,15 +86,20 @@ export default function ServiceDetail() {
                 </span>
                 <div>
                   <h1 className="text-xl font-extrabold tracking-tight text-slate-900">
-                    {svc.name}
+                    {shown.name}
                   </h1>
                   <p className="mt-1 text-xs font-semibold capitalize text-slate-400">
-                    {svc.trade} · {t("cat_all")}
+                    {listing ? `${t("wc_own_category")}: ${listing.category}` : `${shown.trade} · ${t("cat_all")}`}
                   </p>
+                  {listing && (
+                    <p className="mt-0.5 text-[11px] font-semibold text-emerald-700">
+                      {t("wc_by_worker", { name: listing.workerName })} · {listing.district}
+                    </p>
+                  )}
                 </div>
               </div>
 
-              {svc.urgent && (
+              {shown.urgent && (
                 <div className="mt-4 flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700">
                   <Zap className="size-4" />
                   {t("sv_urgent")} — {t("bk_asap")}
@@ -89,7 +109,7 @@ export default function ServiceDetail() {
               <div className="mt-5">
                 <SectionHeader title={t("dt_includes")} />
                 <p className="mt-2 text-sm leading-relaxed text-slate-600">
-                  {svc.desc}
+                  {shown.desc}
                 </p>
                 <ul className="mt-3 space-y-2 text-sm text-slate-600">
                   <li className="flex items-center gap-2">
@@ -98,8 +118,8 @@ export default function ServiceDetail() {
                   </li>
                   <li className="flex items-center gap-2">
                     <Clock className="size-3.5 text-emerald-600" />
-                    {svc.hourly > 0
-                      ? `₹${svc.hourly} ${t("sv_hourly")}`
+                    {shown.hourly > 0
+                      ? `₹${shown.hourly} ${t("sv_hourly")}`
                       : t("fixed_job")}
                   </li>
                   <li className="flex items-center gap-2">
@@ -117,12 +137,12 @@ export default function ServiceDetail() {
               <div className="flex items-baseline justify-between">
                 <span className="text-xs text-slate-500">{t("sv_base")}</span>
                 <span className="text-2xl font-black tracking-tight text-slate-900">
-                  ₹{svc.base}
+                  ₹{shown.base}
                 </span>
               </div>
-              {svc.hourly > 0 && (
+              {shown.hourly > 0 && (
                 <p className="mt-1 text-right text-[11px] text-slate-400">
-                  + ₹{svc.hourly} {t("sv_hourly")}
+                  + ₹{shown.hourly} {t("sv_hourly")}
                 </p>
               )}
 
@@ -134,10 +154,10 @@ export default function ServiceDetail() {
               <div className="mt-4 border-t border-slate-200 pt-3">
                 <RevenueSplitBar
                   compact
-                  total={svc.base}
-                  workerShare={Math.round(svc.base * 0.9)}
-                  welfareAmt={Math.round(svc.base * 0.07)}
-                  opsAmt={svc.base - Math.round(svc.base * 0.9) - Math.round(svc.base * 0.07)}
+                  total={shown.base}
+                  workerShare={Math.round(shown.base * 0.9)}
+                  welfareAmt={Math.round(shown.base * 0.07)}
+                  opsAmt={shown.base - Math.round(shown.base * 0.9) - Math.round(shown.base * 0.07)}
                 />
                 <p className="mt-1.5 text-[10px] font-semibold text-slate-400">
                   0% platform commission — workers keep 90%
@@ -146,7 +166,7 @@ export default function ServiceDetail() {
 
               <TlButton
                 className="mt-5 w-full"
-                onClick={() => navigate(`/book/${svc.id}`)}
+                onClick={() => navigate(`/book/${shown.id}`)}
               >
                 {t("dt_book")}
                 <ArrowRight className="size-4" />

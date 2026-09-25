@@ -15,6 +15,7 @@ import {
   TlButton,
 } from "@/components/terminal";
 import { IdCardDialog } from "@/components/IdCardDialog";
+import WorkListingsPanel from "@/components/WorkListingsPanel";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowRight,
@@ -334,6 +335,14 @@ export default function Onboarding() {
             )}
           </AnimatePresence>
         </div>
+
+        {/* Workers can publish the work they actually do — inside one of the
+            six trades or inside a category they name themselves. */}
+        {artisan && (
+          <div className="mt-6">
+            <WorkListingsPanel />
+          </div>
+        )}
         </>
         )}
       </main>

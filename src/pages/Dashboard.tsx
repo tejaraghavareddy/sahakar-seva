@@ -18,6 +18,7 @@ import {
 } from "@/components/terminal";
 import { IdCardDialog } from "@/components/IdCardDialog";
 import ForecastCard from "@/components/ForecastCard";
+import WorkListingsPanel from "@/components/WorkListingsPanel";
 import {
   Loader2,
   LogOut,
@@ -364,6 +365,10 @@ export default function Dashboard() {
             <div className="lg:col-span-3">
               <ForecastCard />
             </div>
+            {/* My work — publish work in one of the six trades or a category of my own */}
+            <div className="lg:col-span-3">
+              <WorkListingsPanel />
+            </div>
             {/* Left column */}
             <div className="flex flex-col gap-5">
               {/* Telemetry */}
@@ -507,6 +512,11 @@ export default function Dashboard() {
                         <p className="truncate text-xs font-bold text-slate-900">
                           {b.serviceName}
                         </p>
+                        {b.myListing && (
+                          <p className="text-[10px] font-black uppercase tracking-wide text-emerald-700">
+                            ✦ {t("wc_mine")}
+                          </p>
+                        )}
                         <p className="truncate text-[11px] text-slate-500">
                           {b.address.slice(0, 44)} · ₹{b.total} · you earn ₹
                           {b.workerShare}

@@ -1,9 +1,14 @@
 import { useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
-import { useMutation } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useLang } from "@/lib/i18n";
-import { getService, COLOR_SOFT } from "@/lib/trades";
+import {
+  getService,
+  COLOR_SOFT,
+  isCustomServiceId,
+  listingAsService,
+} from "@/lib/trades";
 import { AppHeader } from "@/components/AppHeader";
 import { MonoBadge, Panel, TlButton } from "@/components/terminal";
 import {
@@ -35,6 +40,12 @@ export default function Book() {
   const { t } = useLang();
   const navigate = useNavigate();
   const svc = getService(id ?? "");
+  // `cs_<id>` addresses a worker-created listing that the board approved.
+  const custom = useQuery(api.customServices.approvedByRouteId, {
+    serviceId: isCustomServiceId(id ?? "") ? (id as string) : "none",
+  });
+  const listing = custom ?? null;
+  const shown = svc ?? (listing ? listingAsService(listing) : undefined);
   const createBooking = useMutation(api.bookings.create);
 
   const today = useMemo(() => new Date(), []);
@@ -60,7 +71,14 @@ export default function Book() {
   const [lng, setLng] = useState<number | undefined>();
   const [showMap, setShowMap] = useState(false);
 
-  if (!svc) {
+  if (!shown) {
+    if (isCustomServiceId(id ?? "") && custom === undefined) {
+      return (
+        <div className="flex min-h-screen items-center justify-center">
+          <Loader2 className="size-6 animate-spin text-slate-400" />
+        </div>
+      );
+    }
     return (
       <div className="min-h-screen">
         <AppHeader />
@@ -75,16 +93,16 @@ export default function Book() {
   }
 
   // Cooperative revenue split: 90% worker / 7% welfare / 3% operations.
-  const workerShare = Math.round(svc.base * 0.9);
-  const welfareAmt = Math.round(svc.base * 0.07);
-  const opsAmt = svc.base - workerShare - welfareAmt;
-  const total = svc.base;
-  const soft = COLOR_SOFT[svc.color] ?? COLOR_SOFT.ok;
-  const Icon = svc.icon;
+  const workerShare = Math.round(shown.base * 0.9);
+  const welfareAmt = Math.round(shown.base * 0.07);
+  const opsAmt = shown.base - workerShare - welfareAmt;
+  const total = shown.base;
+  const soft = COLOR_SOFT[shown.color] ?? COLOR_SOFT.ok;
+  const Icon = shown.icon;
 
   async function submit() {
     setError(null);
-    if (!svc) return;
+    if (!shown) return;
     if (!address.trim()) {
       setError(t("bk_need_addr"));
       return;
@@ -95,12 +113,12 @@ export default function Book() {
       const [hh, mm] = slot.split(":");
       scheduled.setHours(Number(hh), Number(mm), 0, 0);
       const bookingId = await createBooking({
-        serviceId: svc.id,
+        serviceId: shown.id,
         address: address,
         lat,
         lng,
         scheduledFor: scheduled.getTime(),
-        urgent: asap && svc.urgent,
+        urgent: asap && shown.urgent,
         notes: notes || undefined,
         welfareOptIn: true,
       });
@@ -116,11 +134,11 @@ export default function Book() {
       <AppHeader />
       <main className="mx-auto w-full max-w-3xl px-4 py-8 sm:px-6">
         <Link
-          to={`/services/${svc.id}`}
+          to={`/services/${shown.id}`}
           className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 transition hover:text-emerald-700"
         >
           <ArrowLeft className="size-3.5" />
-          {svc.name}
+          {shown.name}
         </Link>
 
         <h1 className="mt-4 text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900">
@@ -138,14 +156,14 @@ export default function Book() {
               </span>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-bold text-slate-900">
-                  {svc.name}
+                  {shown.name}
                 </p>
                 <p className="text-xs text-slate-500">
-                  ₹{svc.base} {t("sv_base")}
-                  {svc.hourly > 0 ? ` + ₹${svc.hourly} ${t("sv_hourly")}` : ""}
+                  ₹{shown.base} {t("sv_base")}
+                  {shown.hourly > 0 ? ` + ₹${shown.hourly} ${t("sv_hourly")}` : ""}
                 </p>
               </div>
-              {svc.urgent && (
+              {shown.urgent && (
                 <MonoBadge tone="warn">
                   <Zap className="size-3" /> {t("sv_urgent")}
                 </MonoBadge>
@@ -237,7 +255,7 @@ export default function Book() {
               ))}
             </div>
 
-            {svc.urgent && (
+            {shown.urgent && (
               <button
                 type="button"
                 onClick={() => setAsap((v) => !v)}
@@ -317,7 +335,7 @@ export default function Book() {
             <div className="space-y-1.5 text-sm">
               <div className="flex justify-between">
                 <span className="text-slate-500">{t("bk_visit")}</span>
-                <span className="font-semibold text-slate-900">₹{svc.base}</span>
+                <span className="font-semibold text-slate-900">₹{shown.base}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-500">Worker receives (90%)</span>

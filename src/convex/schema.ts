@@ -108,6 +108,7 @@ const schema = defineSchema(
       workerShare: v.number(), // 90% worker payout
       total: v.number(),
       status: v.string(), // pending|accepted|enroute|inprogress|payment|completed|settled|cancelled
+      customServiceId: v.optional(v.id("customServices")), // set when the booked work is a worker-created listing
       workerId: v.optional(v.id("artisans")), // assigned on accept
       workerUserId: v.optional(v.id("users")),
       workerVpa: v.optional(v.string()), // worker's own UPI id — funds go straight to them
@@ -226,6 +227,34 @@ const schema = defineSchema(
     })
       .index("by_artisan", ["artisanId"])
       .index("by_status", ["status"]),
+
+    // Worker-created work listings — a worker can publish their own service,
+    // either inside one of the six standard trades or inside a category they
+    // define themselves. Board approval puts them on the customer catalog.
+    customServices: defineTable({
+      artisanId: v.id("artisans"), // creator
+      userId: v.id("users"), // denormalized for auth checks
+      name: v.string(), // the work itself, e.g. "Terrace waterproofing"
+      description: v.string(),
+      // One of the six trade ids — decides which workers see it on the radar.
+      trade: v.string(),
+      // Display category: either a standard trade id or the worker's own
+      // category name when they created one.
+      category: v.string(),
+      isCustomCategory: v.boolean(), // true when the worker named their own category
+      base: v.number(), // visit charge, INR
+      hourly: v.number(), // per-hour labour, INR (0 = fixed price job)
+      urgent: v.boolean(),
+      district: v.string(), // creator's district (dispatch filtering)
+      status: v.string(), // "pending" | "approved" | "rejected"
+      reviewNote: v.optional(v.string()),
+      reviewedBy: v.optional(v.id("users")),
+      reviewedAt: v.optional(v.number()),
+      createdAt: v.number(),
+    })
+      .index("by_user", ["userId"])
+      .index("by_status", ["status"])
+      .index("by_trade", ["trade"]),
 
     // Dispute arbitration — double-blind flags from customers and workers
     disputes: defineTable({

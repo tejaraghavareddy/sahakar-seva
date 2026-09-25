@@ -1,6 +1,7 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
-import { query, mutation, QueryCtx } from "./_generated/server";
+import { query, mutation, QueryCtx, MutationCtx } from "./_generated/server";
 import { DEMO_ADMIN_EMAILS } from "./admin";
+import { parseCustomServiceId } from "./customServices";
 import { Doc, Id } from "./_generated/dataModel";
 import { v } from "convex/values";
 
@@ -40,6 +41,46 @@ const SERVICE_PRICES: Record<string, ServicePrice> = {
   "ap-wm": { trade: "appliance", name: "Washing machine repair", base: 299, hourly: 350, urgent: false },
   "ap-mw": { trade: "appliance", name: "Microwave & oven fix", base: 299, hourly: 350, urgent: false },
 };
+
+/** Pricing for a service, from the standard catalog or a worker listing. */
+interface PricedService {
+  trade: string;
+  name: string;
+  base: number;
+  hourly: number;
+  urgent: boolean;
+  customServiceId?: Id<"customServices">;
+}
+
+/**
+ * Resolve the price of the requested service. `cs_<id>` addresses a
+ * worker-created listing, which is only bookable once the board approved it.
+ */
+async function priceService(
+  ctx: QueryCtx | MutationCtx,
+  serviceId: string,
+): Promise<PricedService | null> {
+  const customId = parseCustomServiceId(serviceId);
+  if (customId) {
+    let row: Doc<"customServices"> | null = null;
+    try {
+      row = await ctx.db.get(customId as Id<"customServices">);
+    } catch {
+      return null;
+    }
+    if (!row || row.status !== "approved") return null;
+    return {
+      trade: row.trade,
+      name: row.name,
+      base: row.base,
+      hourly: row.hourly,
+      urgent: row.urgent,
+      customServiceId: row._id,
+    };
+  }
+  const svc = SERVICE_PRICES[serviceId];
+  return svc ? { ...svc } : null;
+}
 
 /* ── Cooperative revenue distribution ──
  * Every booking amount splits three ways:
@@ -111,7 +152,7 @@ export const create = mutation({
   },
   handler: async (ctx, args) => {
     const userId = await requireUser(ctx);
-    const svc = SERVICE_PRICES[args.serviceId];
+    const svc = await priceService(ctx, args.serviceId);
     if (!svc) throw new Error("Unknown service");
     if (!args.address.trim()) throw new Error("Address is required");
     // Cooperative split applied on the gross amount — always, not opt-in.
@@ -121,6 +162,7 @@ export const create = mutation({
     const bookingId = await ctx.db.insert("bookings", {
       customerId: userId,
       serviceId: args.serviceId,
+      customServiceId: svc.customServiceId,
       trade: svc.trade,
       serviceName: svc.name,
       address: args.address.trim(),
@@ -176,7 +218,19 @@ export const listForWorker = query({
         b.trade === me.trade &&
         b.workerUserId === undefined,
     );
-    return { mine, radar: radar.slice(0, 20) };
+    // Flag the entries that came from this worker's own published listing so
+    // the hub can mark them as their own category of work.
+    const myListingIds = new Set<string>();
+    for (const b of radar) {
+      if (!b.customServiceId) continue;
+      const listing = await ctx.db.get(b.customServiceId);
+      if (listing?.userId === userId) myListingIds.add(b._id);
+    }
+    const flagged = radar.map((b) => ({
+      ...b,
+      myListing: myListingIds.has(b._id),
+    }));
+    return { mine, radar: flagged.slice(0, 20) };
   },
 });
 

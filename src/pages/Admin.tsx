@@ -26,9 +26,10 @@ import {
   ScrollText,
   UserPlus,
   Camera,
+  Hammer,
 } from "lucide-react";
 
-type TabId = "overview" | "gis" | "forecast" | "governance" | "skills" | "members" | "societies" | "welfare" | "disputes" | "audit";
+type TabId = "overview" | "gis" | "forecast" | "governance" | "skills" | "works" | "members" | "societies" | "welfare" | "disputes" | "audit";
 
 const TABS: Array<{ id: TabId; label: string; icon: typeof Users }> = [
   { id: "overview", label: "Overview", icon: Users },
@@ -36,6 +37,7 @@ const TABS: Array<{ id: TabId; label: string; icon: typeof Users }> = [
   { id: "forecast", label: "AI Forecast", icon: BrainCircuit },
   { id: "governance", label: "KYC Queue", icon: ShieldCheck },
   { id: "skills", label: "Skill Review", icon: Camera },
+  { id: "works", label: "Work Listings", icon: Hammer },
   { id: "members", label: "Members", icon: UserPlus },
   { id: "societies", label: "District Societies", icon: Building2 },
   { id: "welfare", label: "Welfare & Dividend", icon: HeartPulse },
@@ -119,6 +121,7 @@ export default function Admin() {
           {tab === "forecast" && <ForecastPanel />}
           {tab === "governance" && <GovernancePanel />}
           {tab === "skills" && <SkillReviewPanel />}
+          {tab === "works" && <WorkListingsReviewPanel />}
           {tab === "members" && <MembersPanel />}
           {tab === "societies" && <SocietiesPanel />}
           {tab === "welfare" && <WelfarePanel />}
@@ -1131,6 +1134,127 @@ function SkillReviewPanel() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/80 p-6" onClick={() => setZoom(null)}>
           <img src={zoom} alt="work sample full view" className="max-h-full max-w-full rounded-2xl shadow-2xl" />
         </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Work listings tab — worker-created work awaiting board approval ── */
+
+function WorkListingsReviewPanel() {
+  const { t } = useLang();
+  const queue = useQuery(api.customServices.reviewQueue, {});
+  const review = useMutation(api.customServices.review);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [notes, setNotes] = useState<Record<string, string>>({});
+  const [error, setError] = useState<string | null>(null);
+
+  if (queue === undefined) return <LoadingPlaceholder text="Loading worker work listings…" />;
+
+  async function decide(serviceId: Id<"customServices">, approve: boolean) {
+    setBusy(serviceId);
+    setError(null);
+    try {
+      await review({ serviceId, approve, note: notes[serviceId] || undefined });
+    } catch (e) {
+      setError(
+        e instanceof Error ? e.message.replace(/^\[CONVEX[^\]]*\]\s*/, "") : "Review failed",
+      );
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <div className="space-y-5">
+      <p className="text-xs leading-relaxed text-slate-600">
+        {t("wc_review_sub")}
+      </p>
+
+      {error && (
+        <p className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700">
+          {error}
+        </p>
+      )}
+
+      {queue.length === 0 ? (
+        <Panel title={t("wc_review_title")} bodyClassName="p-0">
+          <div className="flex flex-col items-center gap-2 py-12 text-center">
+            <Hammer className="size-8 text-emerald-400" />
+            <p className="text-sm font-bold text-slate-600">{t("wc_review_empty")}</p>
+          </div>
+        </Panel>
+      ) : (
+        <Panel title={`${t("wc_review_title")} (${queue.length})`} bodyClassName="p-0">
+          <div className="divide-y divide-slate-100">
+            {queue.map((w) => (
+              <div key={w._id} className="px-4 py-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-xs font-black text-slate-900">{w.fullName}</p>
+                  <MonoBadge tone="neutral">{w.trade}</MonoBadge>
+                  <span className="text-[11px] text-slate-500">{w.district}</span>
+                  {w.isCustomCategory && (
+                    <MonoBadge tone="saffron">✦ {t("wc_own_category")}: {w.category}</MonoBadge>
+                  )}
+                  <MonoBadge tone={w.kycStatus === "verified" ? "ok" : "warn"}>
+                    KYC: {w.kycStatus}
+                  </MonoBadge>
+                  <MonoBadge tone={w.skillStatus === "verified" ? "ok" : "warn"}>
+                    {t("br_skill")}: {w.skillStatus}
+                  </MonoBadge>
+                </div>
+
+                <p className="mt-1.5 text-sm font-bold text-slate-900">{w.name}</p>
+                <p className="mt-0.5 text-[11px] leading-relaxed text-slate-600 italic">
+                  “{w.description}”
+                </p>
+                <p className="mt-1 text-[11px] font-semibold text-slate-700">
+                  ₹{w.base} {t("sv_base")}
+                  {w.hourly > 0 ? ` + ₹${w.hourly} ${t("sv_hourly")}` : ""}
+                  {w.urgent ? ` · ${t("sv_urgent")}` : ""}
+                </p>
+                <p className="mt-0.5 text-[10px] text-slate-400">
+                  {new Date(w.createdAt).toLocaleString("en-IN", {
+                    dateStyle: "medium",
+                    timeStyle: "short",
+                  })}
+                </p>
+
+                <input
+                  value={notes[w._id] ?? ""}
+                  onChange={(e) => setNotes((n) => ({ ...n, [w._id]: e.target.value }))}
+                  placeholder={t("wc_note")}
+                  className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs text-slate-900 transition placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none"
+                />
+
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    disabled={busy === w._id}
+                    onClick={() => void decide(w._id, true)}
+                    className="flex items-center gap-1 rounded-xl bg-emerald-600 px-3 py-1.5 text-[11px] font-bold text-white transition hover:bg-emerald-700 disabled:opacity-50"
+                  >
+                    {busy === w._id ? (
+                      <Loader2 className="size-3 animate-spin" />
+                    ) : (
+                      <CheckCircle2 className="size-3" />
+                    )}
+                    {t("wc_approve")}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy === w._id}
+                    onClick={() => void decide(w._id, false)}
+                    className="flex items-center gap-1 rounded-xl border border-rose-200 bg-rose-50 px-3 py-1.5 text-[11px] font-bold text-rose-700 transition hover:bg-rose-100 disabled:opacity-50"
+                  >
+                    <XCircle className="size-3" />
+                    {t("wc_reject")}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Panel>
       )}
     </div>
   );

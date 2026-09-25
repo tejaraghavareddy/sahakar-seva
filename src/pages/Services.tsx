@@ -3,7 +3,13 @@ import { useQuery } from "convex/react";
 import { Link } from "react-router";
 import { api } from "@/convex/_generated/api";
 import { useLang } from "@/lib/i18n";
-import { SERVICES, TRADES, COLOR_SOFT } from "@/lib/trades";
+import {
+  SERVICES,
+  TRADES,
+  COLOR_SOFT,
+  getTrade,
+  type CatalogListing,
+} from "@/lib/trades";
 import { AppHeader } from "@/components/AppHeader";
 import { MonoBadge } from "@/components/terminal";
 import { useDetectedLocation, formatAccuracy } from "@/lib/useLocation";
@@ -20,6 +26,8 @@ import {
   Siren,
   Plus,
   Navigation,
+  Sparkles,
+  Hammer,
 } from "lucide-react";
 
 type Tab = "artisans" | "radar" | "orders";
@@ -36,6 +44,23 @@ export default function Services() {
   const { location, detect } = useDetectedLocation();
 
   const artisans = useQuery(api.artisans.listArtisans, {});
+  // Work the workers themselves published, once the board approved it.
+  const custom = useQuery(api.customServices.approvedCatalog, {});
+
+  const customList = useMemo(() => {
+    const needle = q.trim().toLowerCase();
+    return (custom ?? []).filter((c) => {
+      const inTrade = trade === "all" || c.trade === trade;
+      const inSearch =
+        !needle ||
+        c.name.toLowerCase().includes(needle) ||
+        c.description.toLowerCase().includes(needle) ||
+        c.category.toLowerCase().includes(needle) ||
+        c.workerName.toLowerCase().includes(needle);
+      const inEmergency = !emergencyMode || c.urgent;
+      return inTrade && inSearch && inEmergency;
+    });
+  }, [custom, q, trade, emergencyMode]);
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
@@ -334,7 +359,34 @@ export default function Services() {
               })}
             </div>
 
-            {filtered.length === 0 && (
+            {/* Work the workers themselves created — approved by the board */}
+            {(customList.length > 0 || (custom ?? []).length > 0) && (
+              <section className="mt-10">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-300 bg-emerald-100 px-3 py-1 text-[11px] font-black uppercase tracking-wide text-emerald-900">
+                    <Sparkles className="size-3.5" />
+                    {t("wc_live_title")}
+                  </span>
+                  <span className="text-[11px] text-slate-500 italic">
+                    {t("wc_live_sub")}
+                  </span>
+                </div>
+
+                {customList.length === 0 ? (
+                  <p className="mt-3 rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-6 text-center text-xs text-slate-500">
+                    {t("wc_live_empty")}
+                  </p>
+                ) : (
+                  <div className="mt-4 grid gap-4 pb-14 sm:grid-cols-2 lg:grid-cols-3">
+                    {customList.map((c) => (
+                      <CustomWorkCard key={c._id} listing={c} />
+                    ))}
+                  </div>
+                )}
+              </section>
+            )}
+
+            {filtered.length === 0 && customList.length === 0 && (
               <div className="mx-auto mb-16 mt-8 max-w-lg rounded-3xl border border-slate-200 bg-white px-6 py-10 text-center shadow-xs">
                 <span className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-teal-100 text-teal-700">
                   <HardHat className="size-7" />
@@ -406,6 +458,63 @@ export default function Services() {
         )}
       </div>
     </div>
+  );
+}
+
+/* ── Worker-created work card ──────────────────────── */
+
+function CustomWorkCard({ listing }: { listing: CatalogListing }) {
+  const { t } = useLang();
+  const trade = getTrade(listing.trade);
+  const Icon = trade?.icon ?? Hammer;
+  const soft = COLOR_SOFT[trade?.color ?? "ok"] ?? COLOR_SOFT.ok;
+  return (
+    <Link to={`/services/${listing.routeId}`} className="h-full">
+      <article className="flex h-full flex-col justify-between rounded-2xl border border-emerald-200 bg-white p-5 shadow-xs transition hover:-translate-y-0.5 hover:border-emerald-400 hover:shadow-md">
+        <div>
+          <div className="flex items-start justify-between gap-2">
+            <span className={`flex size-10 items-center justify-center rounded-xl border ${soft}`}>
+              <Icon className="size-5" />
+            </span>
+            {listing.urgent && (
+              <MonoBadge tone="warn">
+                <Zap className="size-3" /> {t("sv_urgent")}
+              </MonoBadge>
+            )}
+          </div>
+          <p className="mt-3 inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
+            <Sparkles className="size-3" />
+            {listing.isCustomCategory
+              ? `${t("wc_own_category")}: ${listing.category}`
+              : listing.category}
+          </p>
+          <h2 className="mt-2 text-sm font-bold text-slate-900">
+            {listing.name}
+          </h2>
+          <p className="mt-1 text-[11px] font-semibold text-slate-500">
+            {t("wc_by_worker", { name: listing.workerName })}
+          </p>
+          <p className="tl-line-clamp-2 mt-1 text-sm leading-6 text-slate-500 italic">
+            {listing.description}
+          </p>
+        </div>
+        <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3">
+          <div>
+            <p className="tl-label">{t("sv_base")}</p>
+            <p className="text-sm font-bold text-slate-900">₹{listing.base}</p>
+            {listing.hourly > 0 && (
+              <p className="text-[11px] text-slate-400">
+                + ₹{listing.hourly} {t("sv_hourly")}
+              </p>
+            )}
+          </div>
+          <span className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-emerald-700 transition hover:bg-emerald-50">
+            {t("sv_view")}
+            <ArrowRight className="size-3.5" />
+          </span>
+        </div>
+      </article>
+    </Link>
   );
 }
 

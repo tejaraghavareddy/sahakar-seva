@@ -308,6 +308,44 @@ const en: Dict = {
   ld_admin_desc: "Officer clearance required. Oversee verification, GIS dispatch, welfare funds, and district societies.",
   ld_admin_cta: "Secure Officer Sign-In →",
   ld_footer_reg: "Official Cooperative Registry · Verified Skilled Artisans",
+  wc_title: "My work listings",
+  wc_sub:
+    "Publish the work you actually do — inside one of the six cooperative trades, or in a category you name yourself. The board reviews every listing before customers can book it.",
+  wc_create: "+ Add my own work",
+  wc_name: "Work name",
+  wc_name_ph: "Terrace waterproofing",
+  wc_desc: "What exactly do you do?",
+  wc_desc_ph:
+    "Two-coat terrace waterproofing with a five-year warranty, old layer removed first.",
+  wc_category: "Category",
+  wc_own_category: "My own category",
+  wc_own_category_ph: "e.g. Solar installation",
+  wc_pick_standard: "← Choose one of the six trades instead",
+  wc_base: "Visit charge (₹)",
+  wc_hourly: "Hourly rate (₹)",
+  wc_urgent: "Offer emergency slots",
+  wc_publish: "Send to the board",
+  wc_cancel: "Cancel",
+  wc_fill_all: "Fill in the work name, description and category.",
+  wc_empty:
+    "You have not published any work yet. Add your first listing — customers in your district can book it directly.",
+  wc_approved: "Live",
+  wc_pending: "In board review",
+  wc_rejected: "Needs a change",
+  wc_remove: "Remove listing",
+  wc_mine: "Your listing",
+  wc_live_title: "Work created by workers",
+  wc_live_sub:
+    "Services written by verified workers and approved by the federation board.",
+  wc_live_empty: "No worker-created work has been published in this filter yet.",
+  wc_by_worker: "by {name}",
+  wc_review_title: "Worker work listings awaiting board review",
+  wc_review_sub:
+    "Workers publish the work they do — inside one of the six trades or in a category they name themselves. Approving a listing puts it on the customer booking page with the cooperative 90/7/3 split.",
+  wc_review_empty: "No worker listings awaiting review.",
+  wc_note: "Review note (sent to the worker)",
+  wc_approve: "Publish listing",
+  wc_reject: "Reject & notify worker",
 };
 
 /* Bengali gateway keys live in ./i18n.bn-gw. They are merged into the `bn`

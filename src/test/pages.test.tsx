@@ -277,7 +277,8 @@ describe("authenticated portals", () => {
 });
 
 describe("no raw translation keys leak into the UI", () => {
-  const pages: [string, () => React.ReactElement, string][] = [
+  // The 4th entry is the route pattern, needed for pages that read useParams.
+  const pages: [string, () => React.ReactElement, string, string?][] = [
     ["Landing", () => <Landing />, "/"],
     ["Services", () => <Services />, "/services"],
     ["ServiceDetail", () => <ServiceDetail />, "/services/ap-ac", "/services/:id"],

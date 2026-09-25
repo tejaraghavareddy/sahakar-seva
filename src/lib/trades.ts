@@ -120,6 +120,59 @@ export function getService(id: string): Service | undefined {
   return SERVICES.find((s) => s.id === id);
 }
 
+/* ---------------- Worker-created work listings ---------------- */
+
+/**
+ * Route/service id prefix for a listing a worker published themselves. The
+ * six standard trades keep their plain ids (`el-fan`, `pl-tap`, ...); a
+ * worker-created work is addressed as `cs_<docId>`.
+ */
+export const CUSTOM_PREFIX = "cs_";
+
+export function customRouteId(id: string): string {
+  return `${CUSTOM_PREFIX}${id}`;
+}
+
+export function isCustomServiceId(id: string): boolean {
+  return id.startsWith(CUSTOM_PREFIX);
+}
+
+/** Shape returned by the `customServices.approvedCatalog` query. */
+export interface CatalogListing {
+  _id: string;
+  routeId: string;
+  name: string;
+  description: string;
+  trade: string;
+  category: string;
+  isCustomCategory: boolean;
+  base: number;
+  hourly: number;
+  urgent: boolean;
+  district: string;
+  workerName: string;
+  createdAt: number;
+}
+
+/**
+ * Present a worker-created listing with the same shape the booking pages
+ * already use for catalog services, so one page renders both.
+ */
+export function listingAsService(listing: CatalogListing): Service {
+  const trade = getTrade(listing.trade);
+  return {
+    id: listing.routeId,
+    trade: (listing.trade as TradeId) ?? "electrician",
+    name: listing.name,
+    desc: listing.description,
+    base: listing.base,
+    hourly: listing.hourly,
+    urgent: listing.urgent,
+    icon: trade?.icon ?? Hammer,
+    color: trade?.color ?? "ok",
+  };
+}
+
 export const COLOR_SOFT: Record<string, string> = {
   saffron: "border-amber-200 bg-amber-50 text-amber-700",
   blue: "border-blue-200 bg-blue-50 text-blue-700",
