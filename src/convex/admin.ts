@@ -89,7 +89,8 @@ async function recordFail(ctx: MutationCtx) {
  * Security hardening:
  *  - every attempt (success or failure) is written to the adminAuditLog
  *  - 5 wrong passcodes lock attempts for 10 minutes (brute-force protection)
- *  - anonymous (guest) sessions are refused the passcode path
+ *  - a correct passcode converts a guest session into the shared demo admin
+ *    account (demo.admin@sahakar.demo) so the passcode alone can grant clearance
  */
 export const emergencyUnlock = mutation({
   args: { passcode: v.string() },
@@ -97,20 +98,6 @@ export const emergencyUnlock = mutation({
     const userId = await requireUser(ctx);
     const user = await ctx.db.get(userId);
     if (!user) throw new Error("Not authenticated");
-
-    // Anonymous sessions must not gain board clearance via a static passcode.
-    if (user.isAnonymous) {
-      await audit(ctx, {
-        actorId: userId,
-        kind: "clearance_denied",
-        method: "passcode",
-        ok: false,
-        detail: "Anonymous session attempted emergency unlock",
-      });
-      throw new Error(
-        "Guest sessions cannot receive board clearance — sign in with your officer email instead",
-      );
-    }
 
     // Brute-force lockout check
     const lock = await getLockout(ctx);
@@ -152,6 +139,27 @@ export const emergencyUnlock = mutation({
     if (lock) {
       await ctx.db.patch(lock._id, { fails: 0, lockedUntil: undefined, updatedAt: now });
     }
+
+    // First-time officer still on a guest session? Convert the guest into the
+    // shared demo admin account so the passcode alone grants clearance.
+    if (user.isAnonymous) {
+      await ctx.db.patch(userId, {
+        isAnonymous: false,
+        email: DEMO_ADMIN_EMAILS[0],
+        name: "Demo Federation Officer",
+        role: "admin",
+      });
+      await audit(ctx, {
+        actorId: userId,
+        email: DEMO_ADMIN_EMAILS[0],
+        kind: "clearance_granted",
+        method: "passcode",
+        ok: true,
+        detail: "Guest session converted to demo admin via emergency passcode",
+      });
+      return { ok: true };
+    }
+
     if (user.role !== "admin") {
       await ctx.db.patch(userId, { role: "admin" });
     }
