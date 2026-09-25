@@ -199,22 +199,9 @@ export default function Landing() {
       {/* ── Cooperative revenue engine band ─────────────────── */}
       <section aria-label="Cooperative revenue engine" className="border-t border-slate-200 bg-white">
         <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
-          <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
-            <div className="flex items-center gap-3 text-left">
-              <SahMark size="md" />
-              <div>
-                <p className="text-sm font-black leading-tight tracking-tight text-slate-900">
-                  Sahakar Seva Cooperative
-                </p>
-                <p className="text-sm font-black leading-tight tracking-tight text-slate-900">
-                  Digital Marketplace
-                </p>
-              </div>
-            </div>
-            <p className="text-xs italic text-slate-400">
-              Registered under Maharashtra Cooperative Societies Act · Connected live ledger
-            </p>
-          </div>
+          <p className="text-center text-xs italic text-slate-400">
+            Registered under Maharashtra Cooperative Societies Act · Connected live ledger
+          </p>
           <div className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-3">
             {/* Welfare share — federation's top preference, listed first */}
             <div className="flex items-start gap-2.5">
