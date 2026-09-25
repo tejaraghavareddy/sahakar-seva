@@ -114,14 +114,7 @@ export default function InteractiveMapPicker({
     [reverse],
   );
 
-  // Initial reverse geocode (sync external Nominatim state on mount)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => {
-    if (initialLat && initialLng) void reverse(initialLat, initialLng);
-    else handleGps(); // auto-detect on open so the pin lands on the user
-  }, []);
-
-  // GPS button
+  // GPS button (declared before the mount effect that uses it)
   const handleGps = useCallback(() => {
     if (!navigator.geolocation) return;
     setGpsLoading(true);
@@ -135,11 +128,19 @@ export default function InteractiveMapPicker({
         setManualLng(b.toFixed(5));
         setGpsAcc(pos.coords.accuracy);
         setGpsLoading(false);
-        // eslint-disable-next-line react-hooks/set-state-in-effect
         reverse(a, b); // syncs address from external Nominatim API
       })
       .catch(() => setGpsLoading(false));
   }, [reverse]);
+
+  // Initial reverse geocode (sync external Nominatim state on mount, once)
+  const didInit = useRef(false);
+  useEffect(() => {
+    if (didInit.current) return;
+    didInit.current = true;
+    if (initialLat && initialLng) void reverse(initialLat, initialLng);
+    else handleGps(); // auto-detect on open so the pin lands on the user
+  }, [initialLat, initialLng, reverse, handleGps]);
 
   // Search debounce
   useEffect(() => {

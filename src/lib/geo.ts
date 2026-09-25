@@ -187,7 +187,13 @@ export async function searchPlaces(
       { headers: { "User-Agent": "SahakarSeva/1.0 (cooperative-gis)" } },
     );
     const data = await res.json();
-    return data.map((r: any) => ({
+    return data.map(
+      (r: {
+        lat: string;
+        lon: string;
+        display_name?: string;
+        name?: string;
+      }) => ({
       lat: parseFloat(r.lat),
       lng: parseFloat(r.lon),
       label: r.display_name || r.name || query,
