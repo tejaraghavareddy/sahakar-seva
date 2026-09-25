@@ -199,9 +199,6 @@ export default function Landing() {
       {/* ── Cooperative revenue engine band ─────────────────── */}
       <section aria-label="Cooperative revenue engine" className="border-t border-slate-200 bg-white">
         <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
-          <p className="text-center text-xs italic text-slate-400">
-            Registered under Maharashtra Cooperative Societies Act · Connected live ledger
-          </p>
           <div className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-3">
             {/* Welfare share — federation's top preference, listed first */}
             <div className="flex items-start gap-2.5">
