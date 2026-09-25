@@ -130,17 +130,24 @@ export const submitQuiz = mutation({
     const userId = await requireUserId(ctx);
     const artisan = await getMyArtisanInternal(ctx, userId);
     if (!artisan) throw new Error("Complete your trade profile first.");
-    if (artisan.quizPassed) {
-      throw new Error("Credential already issued — it is immutable.");
+    // Idempotent: a double-submit or stale retry after the credential was
+    // already issued resolves to the existing credential — never an error.
+    if (artisan.quizPassed && artisan.credentialId) {
+      return { ok: true, alreadyIssued: true, credentialId: artisan.credentialId };
     }
     if (args.score < QUIZ_PASS_MARK) {
       await ctx.db.patch(artisan._id, {
         quizScore: args.score,
         quizTakenAt: Date.now(),
       });
-      throw new Error(
-        `Score ${args.score}% is below the ${QUIZ_PASS_MARK}% pass mark. Re-attempt allowed.`,
-      );
+      // Below-pass is a normal re-attempt outcome, not a server error:
+      // return it as data so the client never logs CONVEX Server Error.
+      return {
+        ok: false as const,
+        score: args.score,
+        passMark: QUIZ_PASS_MARK,
+        message: `Score ${args.score}% is below the ${QUIZ_PASS_MARK}% pass mark. Please re-attempt — you can retake the quiz.`,
+      };
     }
 
     const now = Date.now();
@@ -158,7 +165,7 @@ export const submitQuiz = mutation({
       credentialId,
       credentialIssuedAt: now,
     });
-    return credentialId;
+    return { ok: true as const, credentialId };
   },
 });
 

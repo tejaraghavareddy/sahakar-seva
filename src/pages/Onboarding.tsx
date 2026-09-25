@@ -672,6 +672,12 @@ function StepQuiz({
   }
 
   async function handleSubmit() {
+    // Hole-aware guard: answers is sparse, so filter() would skip unanswered
+    // slots. Index access returns undefined for holes — check every question.
+    if (questions.some((_, i) => answers[i] === undefined)) {
+      setQuizError(t("quiz_error"));
+      return;
+    }
     setSubmitting(true);
     setQuizError(null);
     try {
@@ -680,11 +686,18 @@ function StepQuiz({
         0,
       );
       const score = Math.round((correct / total) * 100);
-      await submitQuiz({ score });
+      const result = await submitQuiz({ score });
+      if (!result.ok) {
+        // Normal re-attempt outcome — show the message, stay on the quiz.
+        setQuizError(result.message ?? t("quiz_error"));
+        return;
+      }
       stopSpeaking();
       onPassed();
     } catch (e) {
-      setQuizError(e instanceof Error ? e.message : t("quiz_error"));
+      // Strip Convex transport prefixes so users see a readable message.
+      const raw = e instanceof Error ? e.message : "";
+      setQuizError(raw.replace(/^\[CONVEX[^\]]*\]\s*/, "") || t("quiz_error"));
     } finally {
       setSubmitting(false);
     }
