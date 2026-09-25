@@ -7,7 +7,8 @@ import { SERVICES, TRADES, COLOR_SOFT } from "@/lib/trades";
 import { AppHeader } from "@/components/AppHeader";
 import { MonoBadge } from "@/components/terminal";
 import { useDetectedLocation, formatAccuracy } from "@/lib/useLocation";
-import { haversine, formatDistance, estimateEtaMinutes } from "@/lib/geo";
+import { formatDistance } from "@/lib/geo";
+import { computeTradeAvailability, serviceAvailability } from "@/lib/availability";
 import {
   Search,
   ArrowRight,
@@ -40,26 +41,11 @@ export default function Services() {
     const needle = q.trim().toLowerCase();
     // Live availability per trade from actual registered artisans — never demo
     // pins, so distance/ETA pills only appear when real workers exist.
-    const byTrade = new Map<string, { count: number; nearestM: number | null }>();
-    for (const a of artisans ?? []) {
-      if (a.kycStatus !== "verified") continue;
-      const e = byTrade.get(a.trade) ?? { count: 0, nearestM: null };
-      e.count += 1;
-      if (typeof a.lat === "number" && typeof a.lng === "number") {
-        const d = haversine(location.lat, location.lng, a.lat, a.lng);
-        if (e.nearestM === null || d < e.nearestM) e.nearestM = d;
-      }
-      byTrade.set(a.trade, e);
-    }
+    const byTrade = computeTradeAvailability(artisans, location);
+    const loading = artisans === undefined;
     let list = SERVICES.map((s) => {
-      const avail = byTrade.get(s.trade);
-      const dist = artisans ? (avail?.nearestM ?? null) : null;
-      return {
-        ...s,
-        artisanCount: artisans ? (avail?.count ?? 0) : null,
-        distM: dist,
-        etaM: dist !== null ? estimateEtaMinutes(dist) : null,
-      };
+      const a = serviceAvailability(byTrade, s.trade, loading);
+      return { ...s, artisanCount: a.artisanCount, distM: a.distM, etaM: a.etaM };
     }).filter((s) => {
       const inTrade = trade === "all" || s.trade === trade;
       const inSearch =
