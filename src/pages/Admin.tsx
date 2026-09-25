@@ -25,15 +25,17 @@ import {
   Plus,
   ScrollText,
   UserPlus,
+  Camera,
 } from "lucide-react";
 
-type TabId = "overview" | "gis" | "forecast" | "governance" | "members" | "societies" | "welfare" | "disputes" | "audit";
+type TabId = "overview" | "gis" | "forecast" | "governance" | "skills" | "members" | "societies" | "welfare" | "disputes" | "audit";
 
 const TABS: Array<{ id: TabId; label: string; icon: typeof Users }> = [
   { id: "overview", label: "Overview", icon: Users },
   { id: "gis", label: "GIS Command Map", icon: Map },
   { id: "forecast", label: "AI Forecast", icon: BrainCircuit },
   { id: "governance", label: "KYC Queue", icon: ShieldCheck },
+  { id: "skills", label: "Skill Review", icon: Camera },
   { id: "members", label: "Members", icon: UserPlus },
   { id: "societies", label: "District Societies", icon: Building2 },
   { id: "welfare", label: "Welfare & Dividend", icon: HeartPulse },
@@ -116,6 +118,7 @@ export default function Admin() {
           {tab === "gis" && <GISPanel />}
           {tab === "forecast" && <ForecastPanel />}
           {tab === "governance" && <GovernancePanel />}
+          {tab === "skills" && <SkillReviewPanel />}
           {tab === "members" && <MembersPanel />}
           {tab === "societies" && <SocietiesPanel />}
           {tab === "welfare" && <WelfarePanel />}
@@ -992,6 +995,143 @@ function AuditPanel() {
         refused the emergency passcode path; all privileged actions (KYC review, booking cancellation,
         clearance grant/deny) are written to this append-only ledger.
       </p>
+    </div>
+  );
+}
+
+/* ── Skill Review tab ── */
+
+function SkillReviewPanel() {
+  const queue = useQuery(api.workSamples.reviewQueue, {});
+  const reviewSample = useMutation(api.workSamples.reviewSample);
+  const reviewKyc = useMutation(api.workSamples.reviewKycFromSkillTab);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [rejecting, setRejecting] = useState<string | null>(null);
+  const [note, setNote] = useState("");
+  const [zoom, setZoom] = useState<string | null>(null);
+
+  if (queue === undefined) return <LoadingPlaceholder text="Loading work evidence…" />;
+
+  async function decide(sampleId: Id<"workSamples">, approve: boolean) {
+    setBusy(sampleId);
+    try {
+      // The note field is shared across rows; send it only for the row being
+      // decided (reject requires it, approve treats it as optional praise).
+      await reviewSample({ sampleId, approve, note: note || undefined });
+      setNote("");
+      setRejecting(null);
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <div className="space-y-5">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
+        <StatTile icon={<Camera className="size-3.5" />} label="Samples awaiting review" value={String(queue.length)} tone="orange" />
+        <StatTile icon={<ShieldCheck className="size-3.5" />} label="With KYC pending too" value={String(queue.filter((q) => q.kycStatus !== "verified").length)} />
+        <StatTile icon={<CheckCircle2 className="size-3.5" />} label="Ready for full verification" value={String(queue.filter((q) => q.kycStatus === "verified").length)} tone="ok" />
+      </div>
+
+      {queue.length === 0 && (
+        <Panel title="Skill verification queue" bodyClassName="p-0">
+          <div className="flex flex-col items-center gap-2 py-12 text-center">
+            <Camera className="size-8 text-emerald-400" />
+            <p className="text-sm font-bold text-slate-600">No work samples awaiting review</p>
+            <p className="text-xs text-slate-400">Workers upload photos of their work from onboarding — they appear here for verification.</p>
+          </div>
+        </Panel>
+      )}
+
+      {queue.length > 0 && (
+        <Panel title={`Work evidence awaiting review (${queue.length})`} bodyClassName="p-0">
+          <div className="divide-y divide-slate-100">
+            {queue.map((s) => (
+              <div key={s._id} className="flex flex-col gap-3 px-4 py-4 sm:flex-row">
+                {/* Thumbnail */}
+                <button
+                  type="button"
+                  onClick={() => setZoom(s.url)}
+                  className="group relative h-40 w-full shrink-0 overflow-hidden rounded-2xl border border-slate-200 bg-slate-100 sm:w-56"
+                >
+                  {s.url && <img src={s.url} alt={s.caption ?? "work sample"} className="size-full object-cover transition group-hover:scale-105" />}
+                  <span className="absolute bottom-1.5 right-1.5 rounded bg-slate-900/70 px-1.5 py-0.5 text-[9px] font-bold text-white">tap to zoom</span>
+                </button>
+
+                {/* Details + actions */}
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-xs font-black text-slate-900">{s.fullName}</p>
+                    <MonoBadge tone="neutral">{s.trade}</MonoBadge>
+                    <span className="text-[11px] text-slate-500">{s.district} · 📞 {s.phone}</span>
+                    <MonoBadge tone={s.kycStatus === "verified" ? "ok" : "warn"}>
+                      KYC: {s.kycStatus}
+                    </MonoBadge>
+                  </div>
+                  {s.caption && <p className="mt-1 text-[11px] italic text-slate-500">“{s.caption}”</p>}
+                  <p className="mt-0.5 text-[10px] text-slate-400">Uploaded {new Date(s.uploadedAt).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}</p>
+
+                  <input
+                    value={note}
+                    onChange={(e) => setNote(e.target.value)}
+                    placeholder="Review note (sent to the worker on reject; optional on approve)…"
+                    className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs text-slate-900 transition placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none"
+                  />
+
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      disabled={busy === s._id}
+                      onClick={() => void decide(s._id, true)}
+                      className="flex items-center gap-1 rounded-xl bg-emerald-600 px-3 py-1.5 text-[11px] font-bold text-white transition hover:bg-emerald-700 disabled:opacity-50"
+                    >
+                      {busy === s._id ? <Loader2 className="size-3 animate-spin" /> : <CheckCircle2 className="size-3" />}
+                      Verify skill {s.kycStatus === "verified" ? "+ issue credential" : ""}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={busy === s._id}
+                      onClick={() => setRejecting(rejecting === s._id ? null : s._id)}
+                      className="flex items-center gap-1 rounded-xl border border-rose-200 bg-rose-50 px-3 py-1.5 text-[11px] font-bold text-rose-700 transition hover:bg-rose-100 disabled:opacity-50"
+                    >
+                      <XCircle className="size-3" /> Reject
+                    </button>
+                    {s.kycStatus === "pending" && (
+                      <button
+                        type="button"
+                        disabled={busy === s._id}
+                        onClick={() => void reviewKyc({ artisanId: s.artisanId, approve: true })}
+                        className="flex items-center gap-1 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-[11px] font-bold text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-50"
+                      >
+                        <ShieldCheck className="size-3" /> Also verify KYC
+                      </button>
+                    )}
+                  </div>
+                  {rejecting === s._id && (
+                    <div className="mt-2 flex flex-wrap items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 p-2">
+                      <p className="text-[10px] font-bold text-rose-800">Confirm rejection — the note above is sent to the worker:</p>
+                      <button
+                        type="button"
+                        disabled={busy === s._id}
+                        onClick={() => void decide(s._id, false)}
+                        className="rounded-xl bg-rose-600 px-3 py-1.5 text-[11px] font-bold text-white transition hover:bg-rose-700 disabled:opacity-50"
+                      >
+                        Reject & notify worker
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </Panel>
+      )}
+
+      {zoom && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/80 p-6" onClick={() => setZoom(null)}>
+          <img src={zoom} alt="work sample full view" className="max-h-full max-w-full rounded-2xl shadow-2xl" />
+        </div>
+      )}
     </div>
   );
 }

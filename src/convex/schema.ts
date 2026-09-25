@@ -73,6 +73,11 @@ const schema = defineSchema(
       removedBy: v.optional(v.id("users")),
       removalNote: v.optional(v.string()),
 
+      // Skill verification — set by the board after reviewing work evidence.
+      skillStatus: v.optional(v.string()), // "pending" | "verified" | "rejected"
+      skillVerifiedAt: v.optional(v.number()),
+      skillRef: v.optional(v.string()),
+
       // cooperative ledger (v1 display only)
       welfareBalance: v.number(),
       dividendBalance: v.number(),
@@ -205,6 +210,22 @@ const schema = defineSchema(
     })
       .index("by_user", ["userId"])
       .index("by_user_read", ["userId", "readAt"]),
+
+    // Work evidence — photos workers upload for skill verification by the board
+    workSamples: defineTable({
+      artisanId: v.id("artisans"),
+      userId: v.id("users"), // owner (denormalized for auth checks)
+      storageId: v.id("_storage"), // Convex file storage reference
+      mimeType: v.string(),
+      caption: v.optional(v.string()),
+      status: v.string(), // "pending" | "approved" | "rejected"
+      reviewNote: v.optional(v.string()),
+      reviewedBy: v.optional(v.id("users")),
+      reviewedAt: v.optional(v.number()),
+      uploadedAt: v.number(),
+    })
+      .index("by_artisan", ["artisanId"])
+      .index("by_status", ["status"]),
 
     // Dispute arbitration — double-blind flags from customers and workers
     disputes: defineTable({

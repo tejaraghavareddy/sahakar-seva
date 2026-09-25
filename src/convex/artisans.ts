@@ -169,37 +169,6 @@ export const submitQuiz = mutation({
   },
 });
 
-/**
- * Confirm skill & conduct (replaces the old voice quiz). Issues the
- * cooperative trade credential. Idempotent.
- */
-export const confirmSkill = mutation({
-  args: {},
-  handler: async (ctx) => {
-    const userId = await requireUserId(ctx);
-    const artisan = await getMyArtisanInternal(ctx, userId);
-    if (!artisan) throw new Error("Complete your trade profile first.");
-    if (artisan.quizPassed && artisan.credentialId) {
-      return { credentialId: artisan.credentialId, alreadyIssued: true };
-    }
-
-    const now = Date.now();
-    const year = new Date(now).getFullYear();
-    const rand = Math.floor(Math.random() * 0xffff)
-      .toString(16)
-      .toUpperCase()
-      .padStart(4, "0");
-    const credentialId = `SSC-${year}-${rand}`;
-
-    await ctx.db.patch(artisan._id, {
-      quizPassed: true,
-      credentialId,
-      credentialIssuedAt: now,
-    });
-    return { credentialId, alreadyIssued: false };
-  },
-});
-
 export const setPresence = mutation({
   args: {
     isOnline: v.boolean(),

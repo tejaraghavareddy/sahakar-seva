@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { HardHat } from "lucide-react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import type { Doc } from "@/convex/_generated/dataModel";
+import type { Doc, Id } from "@/convex/_generated/dataModel";
 import { Link, useNavigate } from "react-router";
 import { useLang } from "@/lib/i18n";
 import {
@@ -23,6 +23,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowRight,
   BadgeCheck,
+  Camera,
   Check,
   HandHeart,
   Loader2,
@@ -69,6 +70,7 @@ export default function Onboarding() {
   const navigate = useNavigate();
 
   const [step, setStep] = useState<Step>(1);
+  const [evidenceDone, setEvidenceDone] = useState(false);
   const [mode, setMode] = useState<"register" | "signin">("register");
   const [form, setForm] = useState<ProfileForm>(EMPTY_FORM);
   const [error, setError] = useState<string | null>(null);
@@ -310,9 +312,11 @@ export default function Onboarding() {
                 exit={{ opacity: 0, x: -24 }}
                 transition={{ duration: 0.22 }}
               >
-                <StepSkill
-                  artisan={artisan}
-                  onNext={() => setStep(4)}
+                <StepEvidence
+                  onSubmitted={() => {
+                    setEvidenceDone(true);
+                    setStep(4);
+                  }}
                   t={t}
                 />
               </motion.div>
@@ -324,8 +328,9 @@ export default function Onboarding() {
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ duration: 0.25 }}
               >
-                <StepCredential
+                <StepBoardReview
                   artisan={artisan}
+                  evidenceDone={evidenceDone}
                   onHub={() => navigate("/dashboard")}
                   t={t}
                 />
@@ -592,88 +597,184 @@ function StepKyc({
   );
 }
 
-/* ══════════ STEP 3 — Skill confirmation ══════════ */
+/* ══════════ STEP 3 — Work evidence upload ══════════ */
 
-function StepSkill({
-  artisan,
-  onNext,
-  t,
-}: {
-  artisan: ArtisanDoc;
-  onNext: () => void;
-  t: TT;
-}) {
-  const confirmSkill = useMutation(api.artisans.confirmSkill);
-  const [confirming, setConfirming] = useState(false);
+const SAMPLE_ALLOWED = ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"];
+
+function StepEvidence({ onSubmitted, t }: { onSubmitted: () => void; t: TT }) {
+  const generateUploadUrl = useMutation(api.workSamples.generateUploadUrl);
+  const completeUpload = useMutation(api.workSamples.completeUpload);
+  const deleteSample = useMutation(api.workSamples.deleteSample);
+  const samples = useQuery(api.workSamples.mySamples, {});
+
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const trade = artisan.trade;
+  const fileRef = useRef<HTMLInputElement | null>(null);
 
-  async function handleConfirm() {
-    setConfirming(true);
+  async function handleFiles(files: FileList | null) {
+    if (!files || files.length === 0) return;
+    setBusy(true);
     setError(null);
     try {
-      await confirmSkill({});
-      onNext();
+      for (const file of Array.from(files)) {
+        if (!SAMPLE_ALLOWED.includes(file.type)) {
+          throw new Error("Only JPG, PNG, WebP or HEIC images are allowed");
+        }
+        if (file.size > 5 * 1024 * 1024) {
+          throw new Error(`"${file.name}" is larger than 5 MB`);
+        }
+        const url = await generateUploadUrl({ mimeType: file.type });
+        const res = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": file.type },
+          body: file,
+        });
+        if (!res.ok) throw new Error("Upload failed — please retry");
+        const { storageId } = (await res.json()) as { storageId: string };
+        await completeUpload({
+          storageId: storageId as unknown as Id<"_storage">,
+          mimeType: file.type,
+        });
+      }
     } catch (e) {
       const raw = e instanceof Error ? e.message : "";
-      setError(raw.replace(/^\[CONVEX[^\]]*\]\s*/, "") || "Could not issue the credential. Please try again.");
-      setConfirming(false);
+      setError(raw.replace(/^\[CONVEX[^\]]*\]\s*/, "") || "Upload failed. Please try again.");
+    } finally {
+      setBusy(false);
+      if (fileRef.current) fileRef.current.value = "";
     }
   }
 
+  const count = samples?.length ?? 0;
+
   return (
     <Panel tag="step 3/4">
-      <div className="flex flex-col items-center py-6 text-center">
+      <div className="flex flex-col items-center py-2 text-center">
         <span className="flex size-14 items-center justify-center rounded-2xl border border-emerald-200 bg-emerald-50">
-          <ShieldCheck className="size-7 text-emerald-700" />
+          <Camera className="size-7 text-emerald-700" />
         </span>
-        <h3 className="mt-4 text-lg font-extrabold text-slate-900">
-          {t("skill_title")}
-        </h3>
-        <p className="mt-1 max-w-md text-sm leading-6 text-slate-600">
-          {t("skill_desc", { trade })}
-        </p>
+        <h3 className="mt-4 text-lg font-extrabold text-slate-900">{t("ev_title")}</h3>
+        <p className="mt-1 max-w-md text-sm leading-6 text-slate-600">{t("ev_desc")}</p>
+
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp,image/heic"
+          multiple
+          className="hidden"
+          onChange={(e) => void handleFiles(e.target.files)}
+        />
+        <TlButton
+          className="mt-5"
+          disabled={busy || count >= 6}
+          onClick={() => fileRef.current?.click()}
+        >
+          {busy ? <Loader2 className="size-4 animate-spin" /> : <Camera className="size-4" />}
+          {count >= 6 ? "maximum 6 photos" : t("ev_upload")}
+        </TlButton>
+        {error && (
+          <p className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-800">{error}</p>
+        )}
+
+        {/* Uploaded samples */}
+        <div className="mt-5 grid w-full grid-cols-2 gap-3 sm:grid-cols-3">
+          {(samples ?? []).map((s) => (
+            <div key={s._id} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
+              <div className="relative h-28 w-full bg-slate-100">
+                {s.url && <img src={s.url} alt={s.caption ?? "work sample"} className="size-full object-cover" />}
+                <span className={`absolute right-1.5 top-1.5 rounded-full px-1.5 py-0.5 text-[9px] font-black uppercase ${
+                  s.status === "approved"
+                    ? "bg-emerald-600 text-white"
+                    : s.status === "rejected"
+                      ? "bg-rose-600 text-white"
+                      : "bg-slate-900/70 text-white"
+                }`}>
+                  {s.status === "approved" ? t("ev_approved") : s.status === "rejected" ? t("ev_rejected") : t("ev_pending")}
+                </span>
+              </div>
+              <div className="flex items-center justify-between gap-2 px-2.5 py-1.5">
+                <span className="truncate text-[10px] text-slate-500">{s.caption || new Date(s.uploadedAt).toLocaleDateString("en-IN")}</span>
+                {s.status === "pending" && (
+                  <button
+                    type="button"
+                    onClick={() => void deleteSample({ sampleId: s._id })}
+                    className="text-[10px] font-bold text-rose-600 hover:underline"
+                  >
+                    {t("ev_delete")}
+                  </button>
+                )}
+              </div>
+              {s.status === "rejected" && s.reviewNote && (
+                <p className="border-t border-slate-100 px-2.5 py-1.5 text-left text-[10px] text-amber-700">{s.reviewNote}</p>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {count > 0 && (
+          <TlButton className="mt-6" onClick={onSubmitted}>
+            {t("ev_submit")}
+            <ArrowRight className="size-4" />
+          </TlButton>
+        )}
+        <p className="mt-3 text-[10px] text-slate-400">{t("ev_note")}</p>
+      </div>
+    </Panel>
+  );
+}
+
+/* ══════════ STEP 4 — Board review status / credential ══════════ */
+
+function StepBoardReview({
+  artisan,
+  evidenceDone,
+  onHub,
+  t,
+}: {
+  artisan: ArtisanDoc;
+  evidenceDone: boolean;
+  onHub: () => void;
+  t: TT;
+}) {
+  const verified = artisan.kycStatus === "verified" && artisan.skillStatus === "verified";
+
+  if (verified) {
+    return (
+      <StepCredential artisan={artisan} onHub={onHub} t={t} />
+    );
+  }
+
+  return (
+    <Panel tag="step 4/4">
+      <div className="flex flex-col items-center py-6 text-center">
+        <span className="flex size-14 items-center justify-center rounded-2xl border border-amber-200 bg-amber-50">
+          <Loader2 className="size-7 animate-spin text-amber-700" />
+        </span>
+        <h3 className="mt-4 text-lg font-extrabold text-slate-900">{t("br_title")}</h3>
+        <p className="mt-1 max-w-md text-sm leading-6 text-slate-600">{t("br_desc")}</p>
 
         <div className="mt-5 w-full max-w-sm space-y-2 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-left text-xs">
-          <div className="flex items-start gap-2">
-            <Check className="mt-0.5 size-3.5 shrink-0 text-emerald-600" />
-            <span className="text-slate-700">
-              I work as a <b>{trade}</b> and my profile details are accurate.
-            </span>
+          <div className="flex items-center justify-between">
+            <span className="text-slate-600">{t("br_kyc")}</span>
+            <MonoBadge tone={artisan.kycStatus === "verified" ? "ok" : artisan.kycStatus === "rejected" ? "neutral" : "warn"}>
+              {artisan.kycStatus === "verified" ? t("ev_approved") : artisan.kycStatus === "rejected" ? t("ev_rejected") : t("ev_pending")}
+            </MonoBadge>
           </div>
-          <div className="flex items-start gap-2">
-            <Check className="mt-0.5 size-3.5 shrink-0 text-emerald-600" />
-            <span className="text-slate-700">
-              I can attend service calls in my district and will keep my
-              availability status up to date.
-            </span>
-          </div>
-          <div className="flex items-start gap-2">
-            <Check className="mt-0.5 size-3.5 shrink-0 text-emerald-600" />
-            <span className="text-slate-700">
-              I will follow the federation code of conduct — fair rates,
-              quality work and respectful conduct with customers.
-            </span>
+          <div className="flex items-center justify-between">
+            <span className="text-slate-600">{t("br_skill")}</span>
+            <MonoBadge tone={artisan.skillStatus === "verified" ? "ok" : artisan.skillStatus === "rejected" ? "neutral" : "warn"}>
+              {artisan.skillStatus === "verified" ? t("ev_approved") : artisan.skillStatus === "rejected" ? t("ev_rejected") : t("ev_pending")}
+            </MonoBadge>
           </div>
         </div>
 
-        {error && (
-          <div className="mt-3 w-full max-w-sm rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">
-            {error}
-          </div>
+        {evidenceDone && (
+          <TlButton variant="outline" className="mt-5" onClick={onHub}>
+            {t("btn_hub")}
+            <ArrowRight className="size-4" />
+          </TlButton>
         )}
-        <TlButton className="mt-6" disabled={confirming} onClick={() => void handleConfirm()}>
-          {confirming ? (
-            <Loader2 className="size-4 animate-spin" />
-          ) : (
-            <Check className="size-4" />
-          )}
-          {t("skill_confirm")}
-          <ArrowRight className="size-4" />
-        </TlButton>
-        <p className="mt-3 text-[10px] text-slate-400">
-          {t("skill_note")}
-        </p>
+        <p className="mt-3 text-[10px] text-slate-400">{t("br_note")}</p>
       </div>
     </Panel>
   );

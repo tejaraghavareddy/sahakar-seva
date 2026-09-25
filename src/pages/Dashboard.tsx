@@ -337,6 +337,27 @@ export default function Dashboard() {
           </Panel>
         )}
 
+        {/* Verification status banner — guides workers through board verification */}
+        {artisan && (artisan.kycStatus !== "verified" || artisan.skillStatus !== "verified") && (
+          <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
+              <p className="text-xs font-bold text-amber-900">Federation verification status:</p>
+              <span className={`text-[11px] font-bold ${artisan.kycStatus === "verified" ? "text-emerald-700" : "text-amber-800"}`}>
+                {artisan.kycStatus === "verified" ? "✓ KYC verified" : artisan.kycStatus === "rejected" ? "✕ KYC rejected — resubmit from onboarding" : "… KYC in board review"}
+              </span>
+              <span className={`text-[11px] font-bold ${artisan.skillStatus === "verified" ? "text-emerald-700" : "text-amber-800"}`}>
+                {artisan.skillStatus === "verified" ? "✓ Skill verified" : artisan.skillStatus === "rejected" ? "✕ Work evidence rejected — upload clearer photos" : "… Skill in board review"}
+              </span>
+            </div>
+            {artisan.skillStatus !== "verified" && (
+              <p className="mt-1.5 text-[11px] text-amber-800">
+                Upload work photos from onboarding so the board can verify your skill —
+                <Link to="/onboarding" className="ml-1 font-bold underline underline-offset-2">open onboarding →</Link>
+              </p>
+            )}
+          </div>
+        )}
+
         {artisan && (
           <div className="mt-6 grid gap-5 lg:grid-cols-3">
             {/* AI Demand & Fair-Price Forecasting */}
