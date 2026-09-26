@@ -36,7 +36,7 @@ const FLOW = [
   "settled",
 ];
 
-/** Razorpay Checkout is loaded on demand in handleGatewayPay. */
+/** Razorpay Checkout, loaded from Razorpay's CDN in index.html. */
 declare global {
   interface Window {
     Razorpay?: new (options: Record<string, unknown>) => { open: () => void };
@@ -232,10 +232,19 @@ export default function BookingDetail() {
               rpPaymentId: response.razorpay_payment_id,
               rpSignature: response.razorpay_signature,
             });
+            setGatewayBusy(false);
             setPaid(true);
-          } catch {
-            // The webhook backstops this; the polling booking row will catch up.
-            setPaid(true);
+          } catch (e) {
+            // The webhook backstops this: if the signature check fails here the
+            // capture still lands server-side and settles the booking, so do not
+            // claim failure to the customer — just stop the spinner and let the
+            // booking row update.
+            setGatewayBusy(false);
+            setGatewayError(
+              e instanceof Error
+                ? e.message
+                : "Confirming the payment — this page will update shortly.",
+            );
           }
         },
         modal: {

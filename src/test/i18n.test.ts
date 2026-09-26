@@ -158,6 +158,9 @@ function effectiveKeys(lang: "en" | "hi" | "te" | "ta" | "bn"): Set<string> {
   if (lang === "ta") for (const k of exportedKeys("i18n.skill.ts", "SKILL_TA")) keys.add(k);
   if (lang === "bn") for (const k of exportedKeys("i18n.skill.ts", "SKILL_BN")) keys.add(k);
   if (lang === "ta") for (const k of exportedKeys("i18n.profile.ts", "PROFILE_TA")) keys.add(k);
+  if (lang === "te") for (const k of exportedKeys("i18n.gateway.ts", "GATEWAY_TE")) keys.add(k);
+  if (lang === "ta") for (const k of exportedKeys("i18n.gateway.ts", "GATEWAY_TA")) keys.add(k);
+  if (lang === "bn") for (const k of exportedKeys("i18n.gateway.ts", "GATEWAY_BN")) keys.add(k);
   return keys;
 }
 
@@ -203,6 +206,9 @@ describe("i18n dictionary integrity", () => {
       ...exportedKeys("i18n.skill.ts", "SKILL_TA"),
       ...exportedKeys("i18n.skill.ts", "SKILL_BN"),
       ...exportedKeys("i18n.profile.ts", "PROFILE_TA"),
+      ...exportedKeys("i18n.gateway.ts", "GATEWAY_TE"),
+      ...exportedKeys("i18n.gateway.ts", "GATEWAY_TA"),
+      ...exportedKeys("i18n.gateway.ts", "GATEWAY_BN"),
     ]);
     expect(side.size).toBeGreaterThan(50);
     const orphans = [...side].filter((k) => !isUsed(k) && !isRetired(k)).sort();

@@ -27,7 +27,8 @@ const STORAGE_KEY = "sahakar.lang";
 type Dict = Record<string, string>;
 import { SKILL_BN, SKILL_HI, SKILL_TA, SKILL_TE } from "./i18n.skill";
 import { PROFILE_TA } from "./i18n.profile";
-import { GATEWAY_TE } from "./i18n.gateway";
+import { GATEWAY_BN, GATEWAY_TA, GATEWAY_TE } from "./i18n.gateway";
+import { GW_BN, PORTAL_BN } from "./i18n.bn-gw";
 
 const en: Dict = {
   /* ── Demand outlook ── */
@@ -39,7 +40,7 @@ const en: Dict = {
     "A federation estimate from weather, the festival calendar and recent local work — not a promise of jobs.",
 
   /* ── Verified gateway checkout ── */
-  bd_gw_pay: "Pay ₹{amount} securely",
+  bd_gw_pay: "Pay securely with",
   bd_gw_note:
     "Card, UPI or netbanking via Razorpay — the federation board gets a signed receipt; the UPI QR below still pays the worker directly.",
 
@@ -471,7 +472,8 @@ const en: Dict = {
   wc_reject: "Reject & notify worker",
 };
 
-/* Bengali gateway keys live in ./i18n.bn-gw. They are merged into the `bn`
+/* Regional gateway-checkout keys live in ./i18n.gateway (te/ta/bn).
+   Bengali gateway keys live in ./i18n.bn-gw. They are merged into the `bn`
    dictionary via initBnGateway() (called once from main.tsx before the first
    render) because this file's tail region resists edits in this environment.
    `en` must stay pure English — t() reads en[key] for the English UI too. */
@@ -483,11 +485,14 @@ export function initBnGateway() {
   Object.assign(te, SKILL_TE);
   Object.assign(ta, SKILL_TA);
   Object.assign(ta, PROFILE_TA);
+  Object.assign(te, GATEWAY_TE);
+  Object.assign(ta, GATEWAY_TA);
+  Object.assign(bn, GATEWAY_BN);
 }
 
 const hi: Dict = {
   /* ── Verified gateway checkout ── */
-  bd_gw_pay: "₹{amount} सुरक्षित रूप से चुकाएँ",
+  bd_gw_pay: "सुरक्षित रूप से चुकाएँ",
   bd_gw_note:
     "Razorpay के ज़रिए कार्ड, UPI या नेटबैंकिंग — फेडरेशन बोर्ड को साइन रसीद मिलती है; नीचे दिया UPI QR सीधे कारीगर को ही भुगतान करता है।",
   gw_op_badge: "संघ सक्रिय — डिस्पैच जारी",

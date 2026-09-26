@@ -49,25 +49,36 @@ export const razorpayWebhook = httpAction(async (ctx, request) => {
 
   if (event.event === "payment.captured") {
     const entity = event.payload?.payment?.entity;
-    const bookingId = entity?.notes?.bookingId;
     const orderId = entity?.order_id;
     const paymentId = entity?.id;
-    if (bookingId && orderId && paymentId) {
-      // Settlement is idempotent and refuses a mismatched order id, so a
-      // replayed, duplicated, or out-of-order delivery cannot double-book the
-      // money. A failure here must not 500: Razorpay retries on 5xx, and a
-      // booking that no longer awaits payment is a normal state, not an error
-      // worth retrying.
-      await ctx
-        .runMutation(internal.bookings.markGatewayPaid, {
-          // The id arrives from a signed-but-untyped payload; markGatewayPaid
-          // re-validates it against the database and any bad id is swallowed
-          // by the catch below rather than surfaced as a 500.
-          bookingId: bookingId as Id<"bookings">,
-          rpOrderId: orderId,
-          rpPaymentId: paymentId,
-        })
-        .catch(() => {});
+    if (orderId && paymentId) {
+      // Razorpay copies an order's notes onto the payment entity, but not on
+      // every event shape, so fall back to looking the booking up by the order
+      // id we stored when opening checkout. Either way the order id is
+      // re-checked against the booking by markGatewayPaid, so a payload that
+      // names the wrong order cannot settle the wrong booking.
+      const bookingId =
+        (await ctx
+          .runQuery(internal.bookings.findByGatewayOrder, { rpOrderId: orderId })
+          .catch(() => null)) ??
+        // The id arrives from a signed-but-untyped payload; markGatewayPaid
+        // re-validates it against the database and any bad id is swallowed by
+        // the catch below rather than surfaced as a 500.
+        (entity?.notes?.bookingId as Id<"bookings"> | undefined);
+      if (bookingId) {
+        // Settlement is idempotent and refuses a mismatched order id, so a
+        // replayed, duplicated, or out-of-order delivery cannot double-book the
+        // money. A failure here must not 500: Razorpay retries on 5xx, and a
+        // booking that no longer awaits payment is a normal state, not an error
+        // worth retrying.
+        await ctx
+          .runMutation(internal.bookings.markGatewayPaid, {
+            bookingId,
+            rpOrderId: orderId,
+            rpPaymentId: paymentId,
+          })
+          .catch(() => {});
+      }
     }
   }
   return new Response(JSON.stringify({ ok: true }), {

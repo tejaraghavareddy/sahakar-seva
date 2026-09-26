@@ -22,9 +22,17 @@ export const queryResults = new Map<string, unknown>();
 /** Mutations the page called, as `"module.function"` → argument list. */
 export const mutationCalls: { path: string; args: unknown }[] = [];
 
+/** Values actions resolve to during a render test, keyed by `"module.function"`. */
+export const actionResults = new Map<string, unknown>();
+
+/** Actions the page invoked, as `"module.function"` → argument list. */
+export const actionCalls: { path: string; args: unknown }[] = [];
+
 export function resetConvexMocks() {
   queryResults.clear();
   mutationCalls.length = 0;
+  actionResults.clear();
+  actionCalls.length = 0;
 }
 
 /** The generated `api` proxy exposes each reference's path behind a symbol. */
@@ -50,9 +58,17 @@ vi.mock("convex/react", () => {
       return undefined;
     };
   };
+  const useAction = (ref: unknown) => {
+    const path = pathOf(ref);
+    return async (args: unknown) => {
+      actionCalls.push({ path, args });
+      return actionResults.get(path);
+    };
+  };
   return {
     useQuery,
     useMutation,
+    useAction,
     usePaginatedQuery: () => ({
       results: [],
       status: "CanLoadMore",

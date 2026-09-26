@@ -166,7 +166,10 @@ const schema = defineSchema(
       .index("by_worker", ["workerUserId"])
       .index("by_status", ["status"])
       .index("by_created", ["createdAt"])
-      .index("by_group", ["groupId"]),
+      .index("by_group", ["groupId"])
+      // Razorpay's webhook does not always carry the booking id through, so
+      // the order id we stored is the reliable join key back to the booking.
+      .index("by_rp_order", ["rpOrderId"]),
 
     // Shared ("group") bookings — the cooperative cost-split. Several nearby
     // households agree on one visit for one service in one window, and the

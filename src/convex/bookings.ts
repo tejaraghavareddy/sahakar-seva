@@ -3,6 +3,7 @@ import {
   query,
   mutation,
   internalMutation,
+  internalQuery,
   QueryCtx,
   MutationCtx,
 } from "./_generated/server";
@@ -520,7 +521,25 @@ export const confirmUtr = mutation({
    * read/write of a booking; the customer is the only one with a reason to
    * call it.
    */
-  export const attachGatewayOrder = mutation({
+  /**
+ * Find the booking a gateway order belongs to.
+ *
+ * Razorpay copies an order's `notes` onto the payment entity, but not on every
+ * event shape, so the webhook cannot always read the booking id straight out of
+ * the payload. The order id we stored on the booking is the reliable join key.
+ */
+export const findByGatewayOrder = internalQuery({
+  args: { rpOrderId: v.string() },
+  handler: async (ctx, args) => {
+    const b = await ctx.db
+      .query("bookings")
+      .withIndex("by_rp_order", (q) => q.eq("rpOrderId", args.rpOrderId))
+      .unique();
+    return b?._id ?? null;
+  },
+});
+
+export const attachGatewayOrder = mutation({
     args: { id: v.id("bookings"), rpOrderId: v.string() },
     handler: async (ctx, args) => {
       const userId = await requireUser(ctx);
