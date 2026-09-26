@@ -14,11 +14,11 @@ interface AdminLoginModalProps {
  * Federation Officer clearance dialog.
  *
  * Clearance is granted by proving ownership of a registered officer email
- * (one-time 6-digit code sent to that inbox). There is deliberately no
- * shared-secret fallback: any passcode baked into this file would ship in the
- * public JS bundle and hand the governance console to anyone who opens
- * devtools. The server re-checks the email against the officer list, so this
- * dialog only drives the OTP step.
+ * (one-time 6-digit code sent to that inbox). There is no shared-secret
+ * fallback for real officers: any passcode baked into this file would ship in
+ * the public JS bundle. The one exception is the fixed demo account, which is
+ * a documented convenience door for judges — the server still re-checks the
+ * address against the demo list, so only that one account can use it.
  */
 export default function AdminLoginModal({ open, onClose, onSuccess }: AdminLoginModalProps) {
   const { isLoading, signIn } = useAuth();
@@ -47,6 +47,22 @@ export default function AdminLoginModal({ open, onClose, onSuccess }: AdminLogin
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not send the code");
     } finally {
+      setBusy(false);
+    }
+  }
+
+  /** One-click entry for the fixed demo officer (SIH judging / testing). */
+  async function handleDemoSignIn() {
+    setBusy(true);
+    setError(null);
+    try {
+      const fd = new FormData();
+      fd.set("email", "demo.admin@sahakar.demo");
+      fd.set("code", "000000");
+      await signIn("demo-admin", fd);
+      onSuccess();
+    } catch {
+      setError("The demo account is unavailable on this deployment.");
       setBusy(false);
     }
   }
@@ -168,6 +184,19 @@ export default function AdminLoginModal({ open, onClose, onSuccess }: AdminLogin
         )}
 
         <div className="rounded-b-3xl border-t border-slate-200 bg-slate-50 px-5 py-3">
+          <button
+            type="button"
+            onClick={() => void handleDemoSignIn()}
+            disabled={busy || isLoading}
+            className="mb-2 flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 bg-white px-4 py-2.5 text-xs font-bold text-slate-600 transition hover:border-emerald-400 hover:text-emerald-700 disabled:opacity-60"
+          >
+            {busy ? (
+              <Loader2 className="size-3.5 animate-spin" />
+            ) : (
+              <ShieldCheck className="size-3.5" />
+            )}
+            Sign in as demo officer
+          </button>
           <p className="text-center text-[10px] leading-relaxed text-slate-400">
             Clearance attempts are written to the federation audit ledger.
             Officer status is verified on the server, never in the browser.
