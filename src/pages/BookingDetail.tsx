@@ -7,6 +7,7 @@ import { useLang } from "@/lib/i18n";
 import type { Id } from "@/convex/_generated/dataModel";
 import { getService, COLOR_SOFT } from "@/lib/trades";
 import { AppHeader } from "@/components/AppHeader";
+import { BackToHome } from "@/components/BackToHome";
 import { MonoBadge, Panel, StatusDot, TlButton } from "@/components/terminal";
 import {
   ArrowLeft,
@@ -192,13 +193,17 @@ export default function BookingDetail() {
     <div className="min-h-screen">
       <AppHeader />
       <main className="mx-auto w-full max-w-4xl px-4 py-8 sm:px-6">
-        <Link
+        <div className="flex flex-wrap items-center gap-3">
+          <BackToHome />
+          <span className="text-slate-300">·</span>
+          <Link
           to="/bookings"
           className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 transition hover:text-emerald-700"
         >
           <ArrowLeft className="size-3.5" />
           {t("bks_title")}
         </Link>
+        </div>
 
         {/* Header */}
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3">

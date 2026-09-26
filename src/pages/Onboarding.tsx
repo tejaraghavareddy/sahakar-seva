@@ -4,6 +4,7 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Doc, Id } from "@/convex/_generated/dataModel";
 import { Link, useNavigate } from "react-router";
+import { BackToHome } from "@/components/BackToHome";
 import { useLang } from "@/lib/i18n";
 import { TRADES, type TradeId } from "@/lib/trades";
 import {
@@ -161,6 +162,9 @@ export default function Onboarding() {
         </div>
       </header>
 
+      <div className="mx-auto w-full max-w-3xl px-4 pt-3 sm:px-6">
+        <BackToHome />
+      </div>
       <main className="mx-auto w-full max-w-3xl px-4 py-8 sm:px-6">
         {/* ── Skilled Worker & Artisan Portal header card ────── */}
         <div className="mb-6 flex flex-col items-center rounded-3xl border border-slate-200 bg-white px-6 py-8 text-center shadow-xs">

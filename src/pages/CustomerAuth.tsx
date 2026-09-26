@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { Suspense, useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
+import { BackToHome } from "@/components/BackToHome";
 
 function resolveReturnTo(returnTo: string | null, fallback = "/services") {
   if (returnTo?.startsWith("/") && !returnTo.startsWith("//")) {
@@ -111,6 +112,9 @@ function CustomerAuth() {
           <LanguagePicker />
         </div>
       </header>
+      <div className="mx-auto w-full max-w-5xl px-4 pt-3 sm:px-6">
+        <BackToHome />
+      </div>
 
       <div className="mx-auto grid w-full max-w-5xl flex-1 items-center gap-10 px-4 py-12 sm:px-6 lg:grid-cols-2">
         {/* Left: themed booking-portal pitch */}

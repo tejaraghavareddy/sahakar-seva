@@ -19,6 +19,7 @@ import { useLang } from "@/lib/i18n";
 import { ArrowRight, HandHeart, Loader2, Mail, UserX } from "lucide-react";
 import { Suspense, useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
+import { BackToHome } from "@/components/BackToHome";
 
 interface AuthProps {
   redirectAfterAuth?: string;
@@ -117,6 +118,9 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
           <LanguagePicker />
         </div>
       </header>
+      <div className="mx-auto w-full max-w-3xl px-4 pt-3 sm:px-6">
+        <BackToHome />
+      </div>
 
       {/* Auth content */}
       <div className="tl-glow flex flex-1 items-center justify-center px-4 py-12">

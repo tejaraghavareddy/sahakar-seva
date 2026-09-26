@@ -4,6 +4,7 @@ import { api } from "@/convex/_generated/api";
 import { useLang } from "@/lib/i18n";
 import { getService, COLOR_SOFT } from "@/lib/trades";
 import { AppHeader } from "@/components/AppHeader";
+import { BackToHome } from "@/components/BackToHome";
 import { MonoBadge, Panel, TlButton } from "@/components/terminal";
 import { ArrowRight, CalendarDays } from "lucide-react";
 
@@ -26,7 +27,8 @@ export default function Bookings() {
     <div className="min-h-screen">
       <AppHeader />
       <main className="mx-auto w-full max-w-4xl px-4 py-8 sm:px-6">
-        <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900">
+        <BackToHome />
+        <h1 className="mt-3 text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900">
           {t("bks_title")}
         </h1>
 

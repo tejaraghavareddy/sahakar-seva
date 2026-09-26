@@ -10,6 +10,7 @@ import {
   listingAsService,
 } from "@/lib/trades";
 import { AppHeader } from "@/components/AppHeader";
+import { BackToHome } from "@/components/BackToHome";
 import { MonoBadge, Panel, TlButton } from "@/components/terminal";
 import {
   ArrowLeft,
@@ -133,13 +134,17 @@ export default function Book() {
     <div className="min-h-screen">
       <AppHeader />
       <main className="mx-auto w-full max-w-3xl px-4 py-8 sm:px-6">
-        <Link
+        <div className="flex flex-wrap items-center gap-3">
+          <BackToHome />
+          <span className="text-slate-300">·</span>
+          <Link
           to={`/services/${shown.id}`}
           className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 transition hover:text-emerald-700"
         >
           <ArrowLeft className="size-3.5" />
           {shown.name}
         </Link>
+        </div>
 
         <h1 className="mt-4 text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900">
           {t("bk_title")}

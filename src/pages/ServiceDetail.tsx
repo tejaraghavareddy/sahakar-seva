@@ -4,6 +4,7 @@ import { api } from "@/convex/_generated/api";
 import { useLang } from "@/lib/i18n";
 import { getService, getTrade, COLOR_SOFT, isCustomServiceId, listingAsService } from "@/lib/trades";
 import { AppHeader } from "@/components/AppHeader";
+import { BackToHome } from "@/components/BackToHome";
 import { Panel, SectionHeader, TlButton, StatusDot } from "@/components/terminal";
 import { RevenueSplitBar } from "@/components/RevenueSplit";
 import {
@@ -66,13 +67,17 @@ export default function ServiceDetail() {
     <div className="min-h-screen">
       <AppHeader />
       <main className="mx-auto w-full max-w-4xl px-4 py-8 sm:px-6">
-        <Link
+        <div className="flex flex-wrap items-center gap-3">
+          <BackToHome />
+          <span className="text-slate-300">·</span>
+          <Link
           to="/services"
           className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 transition hover:text-emerald-700"
         >
           <ArrowLeft className="size-3.5" />
           {t("bks_browse")}
         </Link>
+        </div>
 
         <div className="mt-5 grid gap-5 md:grid-cols-5">
           {/* Main info */}

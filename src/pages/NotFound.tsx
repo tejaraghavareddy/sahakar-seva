@@ -1,5 +1,7 @@
 import { motion } from "framer-motion";
 
+import { BackToHome } from "@/components/BackToHome";
+
 export default function NotFound() {
   return (
     <motion.div
@@ -10,6 +12,9 @@ export default function NotFound() {
     >
 
       
+      <div className="mx-auto w-full max-w-5xl px-4 pt-6">
+        <BackToHome />
+      </div>
       {/* Main Content */}
       <div className="flex-1 flex flex-col items-center justify-center">
         <div className="max-w-5xl mx-auto relative px-4">

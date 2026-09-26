@@ -3,6 +3,7 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { Link } from "react-router";
+import { BackToHome } from "@/components/BackToHome";
 import { useAuth } from "@/hooks/use-auth";
 import { useLang } from "@/lib/i18n";
 import { getTrade } from "@/lib/trades";
@@ -237,6 +238,9 @@ export default function Dashboard() {
         </div>
       </header>
 
+      <div className="mx-auto w-full max-w-5xl px-4 pt-3 sm:px-6">
+        <BackToHome />
+      </div>
       <main className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-6">
         {/* Greeting + presence */}
         <div className="flex flex-wrap items-end justify-between gap-4">

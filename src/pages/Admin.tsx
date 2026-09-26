@@ -6,6 +6,7 @@ import type { Id } from "@/convex/_generated/dataModel";
 import { useLang } from "@/lib/i18n";
 import { getTrade, COLOR_SOFT } from "@/lib/trades";
 import { AppHeader } from "@/components/AppHeader";
+import { BackToHome } from "@/components/BackToHome";
 import { MonoBadge, Panel, StatusDot, TlButton } from "@/components/terminal";
 import FederationGISMap from "@/components/map/FederationGISMap";
 import LocationPickerModal from "@/components/map/LocationPickerModal";
@@ -84,7 +85,8 @@ export default function Admin() {
     <div className="min-h-screen">
       <AppHeader />
       <main className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
-        <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900">
+        <BackToHome />
+        <h1 className="mt-3 text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900">
           {t("ad_title")}
         </h1>
         <p className="mt-1 text-sm text-slate-600">{t("ad_sub")}</p>

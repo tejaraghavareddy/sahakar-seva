@@ -11,6 +11,7 @@ import {
   type CatalogListing,
 } from "@/lib/trades";
 import { AppHeader } from "@/components/AppHeader";
+import { BackToHome } from "@/components/BackToHome";
 import { MonoBadge } from "@/components/terminal";
 import { useDetectedLocation, formatAccuracy } from "@/lib/useLocation";
 import { formatDistance } from "@/lib/geo";
@@ -102,6 +103,9 @@ export default function Services() {
   return (
     <div className="flex min-h-screen flex-col bg-gradient-to-b from-slate-50 via-emerald-50/30 to-slate-100 font-sans text-slate-900 antialiased">
       <AppHeader />
+      <div className="mx-auto w-full max-w-6xl px-4 pt-3 sm:px-6">
+        <BackToHome />
+      </div>
 
       {/* ── Portal banner + location/user row ────────────────── */}
       <div className="mx-auto w-full max-w-6xl px-4 pt-4 sm:px-6">
