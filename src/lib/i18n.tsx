@@ -35,6 +35,7 @@ import {
   SUPERADMIN_TA,
   SUPERADMIN_TE,
 } from "./i18n.superadmin";
+import { EV_BN, EV_HI, EV_TA, EV_TE } from "./i18n.ev";
 
 const en: Dict = {
   /* ── Demand outlook ── */
@@ -466,6 +467,9 @@ const en: Dict = {
   sa_appoint: "Appoint",
   sa_unscoped: "no federation assigned",
   sa_remove: "Remove access",
+
+  /* ── Work evidence: verified photos are released ── */
+  ev_released: "Photo released after verification",
   wc_title: "My work listings",
   wc_sub:
     "Publish the work you actually do — inside one of the six cooperative trades, or in a category you name yourself. The board reviews every listing before customers can book it.",
@@ -526,6 +530,10 @@ export function initBnGateway() {
   Object.assign(te, SUPERADMIN_TE);
   Object.assign(ta, SUPERADMIN_TA);
   Object.assign(bn, SUPERADMIN_BN);
+  Object.assign(hi, EV_HI);
+  Object.assign(te, EV_TE);
+  Object.assign(ta, EV_TA);
+  Object.assign(bn, EV_BN);
 }
 
 const hi: Dict = {

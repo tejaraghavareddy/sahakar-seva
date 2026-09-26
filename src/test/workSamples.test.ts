@@ -424,3 +424,116 @@ describe("workSamples:reviewKycFromSkillTab", () => {
     expect(notices[0].body).toContain("ID number did not match");
   });
 });
+
+describe("workSamples: verified samples release their image", () => {
+  /** One sample through the full upload -> board approval path. */
+  async function approvedSample(
+    t: ReturnType<typeof setupTest>,
+    opts: { note?: string } = {},
+  ) {
+    const a = await seedAdmin(t);
+    const w = await seedWorker(t);
+    const artisan = await seedArtisan(t, w.id);
+    const storageId = await seedStorageFile(t);
+    const sampleId = await w.as.mutation(api.workSamples.completeUpload, {
+      storageId,
+      mimeType: "image/png",
+      caption: "finished staircase",
+    });
+    await a.as.mutation(api.workSamples.reviewSample, {
+      sampleId,
+      approve: true,
+      note: opts.note,
+    });
+    return { a, w, artisan, storageId, sampleId };
+  }
+
+  it("deletes the file from storage once the board approves", async () => {
+    const t = setupTest();
+    const { storageId, sampleId } = await approvedSample(t);
+
+    // The image itself is gone — not merely hidden.
+    expect(await t.run((ctx) => ctx.db.system.get(storageId))).toBeNull();
+    // The row survives, because the verdict is the audit trail.
+    expect(await t.run((ctx) => ctx.db.get(sampleId))).not.toBeNull();
+  });
+
+  it("keeps a written verdict in place of the picture", async () => {
+    const t = setupTest();
+    const { sampleId } = await approvedSample(t, { note: "Clean finish, correct tools" });
+
+    const row = must(await t.run((ctx) => ctx.db.get(sampleId)), "sample");
+    expect(row.storageId).toBeUndefined();
+    expect(row.imagePurgedAt).toBeGreaterThan(0);
+    expect(row.verdictText).toContain("verified by the federation board");
+    expect(row.verdictText).toContain("Clean finish, correct tools");
+    expect(row.reviewedAt).toBeGreaterThan(0);
+  });
+
+  it("shows the worker the verdict text and no broken image", async () => {
+    const t = setupTest();
+    const { w } = await approvedSample(t);
+
+    const mine = await w.as.query(api.workSamples.mySamples);
+    expect(mine).toHaveLength(1);
+    expect(mine[0].hasImage).toBe(false);
+    expect(mine[0].url).toBeNull();
+    expect(mine[0].verdictText).toContain("no longer stored");
+  });
+
+  it("does not consume an upload slot, so the worker can submit more work", async () => {
+    const t = setupTest();
+    const a = await seedAdmin(t);
+    const w = await seedWorker(t);
+    await seedArtisan(t, w.id);
+
+    // Fill all six slots and have the board verify all six.
+    for (let i = 0; i < 6; i++) {
+      const id = await w.as.mutation(api.workSamples.completeUpload, {
+        storageId: await seedStorageFile(t),
+        mimeType: "image/png",
+      });
+      await a.as.mutation(api.workSamples.reviewSample, { sampleId: id, approve: true });
+    }
+    // A seventh upload must still be possible: the six released images no
+    // longer hold any of the worker's quota.
+    const seventh = await w.as.mutation(api.workSamples.completeUpload, {
+      storageId: await seedStorageFile(t),
+      mimeType: "image/png",
+    });
+    expect(seventh).toBeTruthy();
+    const mine = await w.as.query(api.workSamples.mySamples);
+    expect(mine.filter((m) => m.hasImage)).toHaveLength(1);
+  });
+
+  it("keeps the image for a REJECTED sample — the worker may appeal it", async () => {
+    const t = setupTest();
+    const a = await seedAdmin(t);
+    const w = await seedWorker(t);
+    await seedArtisan(t, w.id);
+    const storageId = await seedStorageFile(t);
+    const sampleId = await w.as.mutation(api.workSamples.completeUpload, {
+      storageId,
+      mimeType: "image/png",
+    });
+    await a.as.mutation(api.workSamples.reviewSample, {
+      sampleId,
+      approve: false,
+      note: "Too blurry",
+    });
+
+    const row = must(await t.run((ctx) => ctx.db.get(sampleId)), "sample");
+    expect(row.storageId).toBe(storageId);
+    expect(await t.run((ctx) => ctx.db.system.get(storageId))).not.toBeNull();
+    const mine = await w.as.query(api.workSamples.mySamples);
+    expect(mine[0].hasImage).toBe(true);
+  });
+
+  it("a released sample cannot be deleted, and its empty row is inert", async () => {
+    const t = setupTest();
+    const { w, sampleId } = await approvedSample(t);
+    await expect(
+      w.as.mutation(api.workSamples.deleteSample, { sampleId }),
+    ).rejects.toThrow("Reviewed samples cannot be deleted");
+  });
+});

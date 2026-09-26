@@ -659,7 +659,9 @@ function StepEvidence({ onSubmitted, t }: { onSubmitted: () => void; t: TT }) {
     }
   }
 
-  const count = samples?.length ?? 0;
+  // Only samples still holding a picture count toward the upload cap: a
+  // verified sample keeps its row (the verdict) but no longer stores an image.
+  const count = (samples ?? []).filter((s) => s.hasImage).length;
 
   return (
     <Panel tag="step 3/4">
@@ -694,18 +696,31 @@ function StepEvidence({ onSubmitted, t }: { onSubmitted: () => void; t: TT }) {
         <div className="mt-5 grid w-full grid-cols-2 gap-3 sm:grid-cols-3">
           {(samples ?? []).map((s) => (
             <div key={s._id} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
-              <div className="relative h-28 w-full bg-slate-100">
-                {s.url && <img src={s.url} alt={s.caption ?? "work sample"} className="size-full object-cover" />}
-                <span className={`absolute right-1.5 top-1.5 rounded-full px-1.5 py-0.5 text-[9px] font-black uppercase ${
-                  s.status === "approved"
-                    ? "bg-emerald-600 text-white"
-                    : s.status === "rejected"
-                      ? "bg-rose-600 text-white"
-                      : "bg-slate-900/70 text-white"
-                }`}>
-                  {s.status === "approved" ? t("ev_approved") : s.status === "rejected" ? t("ev_rejected") : t("ev_pending")}
-                </span>
-              </div>
+              {s.hasImage ? (
+                <div className="relative h-28 w-full bg-slate-100">
+                  {s.url && <img src={s.url} alt={s.caption ?? "work sample"} className="size-full object-cover" />}
+                  <span className={`absolute right-1.5 top-1.5 rounded-full px-1.5 py-0.5 text-[9px] font-black uppercase ${
+                    s.status === "approved"
+                      ? "bg-emerald-600 text-white"
+                      : s.status === "rejected"
+                        ? "bg-rose-600 text-white"
+                        : "bg-slate-900/70 text-white"
+                  }`}>
+                    {s.status === "approved" ? t("ev_approved") : s.status === "rejected" ? t("ev_rejected") : t("ev_pending")}
+                  </span>
+                </div>
+              ) : (
+                /* Verified sample: the photo was released after the board's
+                   decision, so the verdict text takes its place. */
+                <div className="flex h-28 w-full flex-col items-center justify-center gap-1 bg-emerald-50/70 px-3 text-center">
+                  <span className="text-[9px] font-black uppercase tracking-wide text-emerald-700">
+                    {t("ev_released")}
+                  </span>
+                  <p className="line-clamp-4 text-[9px] leading-3.5 text-emerald-900/80">
+                    {s.verdictText}
+                  </p>
+                </div>
+              )}
               <div className="flex items-center justify-between gap-2 px-2.5 py-1.5">
                 <span className="truncate text-[10px] text-slate-500">{s.caption || new Date(s.uploadedAt).toLocaleDateString("en-IN")}</span>
                 {s.status === "pending" && (

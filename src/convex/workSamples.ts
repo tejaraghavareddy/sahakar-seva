@@ -63,7 +63,11 @@ export const completeUpload = mutation({
       .query("workSamples")
       .withIndex("by_artisan", (q) => q.eq("artisanId", artisan._id))
       .collect();
-    if (existing.length >= MAX_SAMPLES) {
+    // Only samples that still hold a picture count against the quota: a
+    // verified sample keeps its row (the verdict) but its image is released,
+    // so it must not permanently consume one of the worker's six slots.
+    const holdingImages = existing.filter((r) => r.storageId !== undefined);
+    if (holdingImages.length >= MAX_SAMPLES) {
       throw new Error(`You can upload up to ${MAX_SAMPLES} work photos`);
     }
 
@@ -89,6 +93,7 @@ export const deleteSample = mutation({
     if (!sample) throw new Error("Sample not found");
     if (sample.userId !== userId) throw new Error("Forbidden");
     if (sample.status !== "pending") throw new Error("Reviewed samples cannot be deleted");
+    if (!sample.storageId) throw new Error("This sample no longer has a stored image");
 
     await ctx.storage.delete(sample.storageId);
     await ctx.db.delete(args.sampleId);
@@ -112,7 +117,10 @@ export const mySamples = query({
     const withUrls = await Promise.all(
       rows.map(async (r) => ({
         ...r,
-        url: await ctx.storage.getUrl(r.storageId),
+        // A released sample has no picture left to serve; the verdict text
+        // replaces it, so `url` is null rather than a broken image.
+        url: r.storageId ? await ctx.storage.getUrl(r.storageId) : null,
+        hasImage: r.storageId !== undefined,
       })),
     );
     return withUrls.sort((a, b) => b.uploadedAt - a.uploadedAt);
@@ -142,7 +150,9 @@ export const reviewQueue = query({
         const artisan = artisanCache.get(r.artisanId);
         return {
           _id: r._id,
-          url: await ctx.storage.getUrl(r.storageId),
+          // Only pending samples reach the queue, and a pending sample always
+          // still has its picture (a released one is approved, never pending).
+          url: r.storageId ? await ctx.storage.getUrl(r.storageId) : null,
           mimeType: r.mimeType,
           caption: r.caption,
           uploadedAt: r.uploadedAt,
@@ -165,6 +175,12 @@ export const reviewQueue = query({
  * worker's KYC is verified, both skill verification and KYC are set to
  * "verified" and the cooperative trade credential is issued.
  * A rejection records the reason and notifies the worker to re-upload.
+ *
+ * APPROVED SAMPLES RELEASE THEIR IMAGE. The board has seen the evidence and
+ * recorded the decision; a worker photo of their work, tools, premises or
+ * face is personal data that has no reason to be retained afterwards. So the
+ * file is deleted from storage and a written verdict takes its place. The row
+ * is kept, because the verdict IS the audit trail.
  */
 export const reviewSample = mutation({
   args: {
@@ -184,15 +200,40 @@ export const reviewSample = mutation({
     if (!artisan) throw new Error("Worker profile not found");
 
     const now = Date.now();
+
+    // Release the picture on approval, and never let a storage hiccup cost the
+    // worker their verdict: if the delete fails the row keeps its storageId
+    // (so the file is still visible and can be swept later) and the verdict
+    // stands either way.
+    let release: { storageId: undefined; imagePurgedAt: number; verdictText: string } | null =
+      null;
+    if (args.approve && sample.storageId) {
+      try {
+        await ctx.storage.delete(sample.storageId);
+        const note = args.note?.trim();
+        release = {
+          storageId: undefined,
+          imagePurgedAt: now,
+          verdictText:
+            `Work evidence verified by the federation board on ` +
+            `${new Date(now).toLocaleDateString("en-IN")}.` +
+            (note ? ` Board note: ${note}` : "") +
+            " The photo was released after review and is no longer stored.",
+        };
+      } catch {
+        release = null; // image stays on file; the verdict is unaffected
+      }
+    }
+
     await ctx.db.patch(sample._id, {
       status: args.approve ? "approved" : "rejected",
       reviewedBy: adminId,
       reviewedAt: now,
       reviewNote: args.note?.trim() || undefined,
+      ...(release ?? {}),
     });
 
     if (args.approve) {
-      const now = Date.now();
       const skillRef = `SKC-${now.toString(36).toUpperCase().slice(-8)}`;
       const patch: Record<string, unknown> = {
         skillStatus: "verified",

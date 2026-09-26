@@ -320,11 +320,18 @@ const schema = defineSchema(
     workSamples: defineTable({
       artisanId: v.id("artisans"),
       userId: v.id("users"), // owner (denormalized for auth checks)
-      storageId: v.id("_storage"), // Convex file storage reference
+      // Cleared once a verified sample's image is released. Work photos are
+      // personal data — the board's decision is the record, the picture does
+      // not need to outlive it.
+      storageId: v.optional(v.id("_storage")),
       mimeType: v.string(),
       caption: v.optional(v.string()),
       status: v.string(), // "pending" | "approved" | "rejected"
       reviewNote: v.optional(v.string()),
+      // The text that stands in for the released image, so the worker still
+      // sees a verdict rather than an empty tile.
+      verdictText: v.optional(v.string()),
+      imagePurgedAt: v.optional(v.number()),
       reviewedBy: v.optional(v.id("users")),
       reviewedAt: v.optional(v.number()),
       uploadedAt: v.number(),

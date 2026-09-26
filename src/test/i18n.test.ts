@@ -8,6 +8,7 @@ import {
   SUPERADMIN_TA,
   SUPERADMIN_TE,
 } from "@/lib/i18n.superadmin";
+import { EV_BN, EV_HI, EV_TA, EV_TE } from "@/lib/i18n.ev";
 
 /**
  * Guards against the two most common i18n defects in this project:
@@ -171,6 +172,10 @@ function effectiveKeys(lang: "en" | "hi" | "te" | "ta" | "bn"): Set<string> {
   if (lang === "te") for (const k of Object.keys(SUPERADMIN_TE)) keys.add(k);
   if (lang === "ta") for (const k of Object.keys(SUPERADMIN_TA)) keys.add(k);
   if (lang === "bn") for (const k of Object.keys(SUPERADMIN_BN)) keys.add(k);
+  if (lang === "hi") for (const k of Object.keys(EV_HI)) keys.add(k);
+  if (lang === "te") for (const k of Object.keys(EV_TE)) keys.add(k);
+  if (lang === "ta") for (const k of Object.keys(EV_TA)) keys.add(k);
+  if (lang === "bn") for (const k of Object.keys(EV_BN)) keys.add(k);
   return keys;
 }
 
@@ -223,6 +228,10 @@ describe("i18n dictionary integrity", () => {
       ...Object.keys(SUPERADMIN_TE),
       ...Object.keys(SUPERADMIN_TA),
       ...Object.keys(SUPERADMIN_BN),
+      ...Object.keys(EV_HI),
+      ...Object.keys(EV_TE),
+      ...Object.keys(EV_TA),
+      ...Object.keys(EV_BN),
     ]);
     expect(side.size).toBeGreaterThan(50);
     const orphans = [...side].filter((k) => !isUsed(k) && !isRetired(k)).sort();
