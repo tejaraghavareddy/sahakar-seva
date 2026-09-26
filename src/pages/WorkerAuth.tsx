@@ -6,7 +6,7 @@ import {
 } from "@/components/ui/input-otp";
 import { LanguagePicker } from "@/components/terminal";
 import { useAuth } from "@/hooks/use-auth";
-import { useMutation } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useLang } from "@/lib/i18n";
 // The provider ids are owned by a client-safe constants module, so the screens
@@ -60,7 +60,25 @@ function WorkerAuth() {
   const [searchParams] = useSearchParams();
   const redirect = resolveReturnTo(searchParams.get("returnTo"));
 
-  const [method, setMethod] = useState<"phone" | "email">("phone");
+  // Whether SMS is actually deliverable on this deployment. Without this the
+  // phone tab is a trap: the provider throws on send, and the worker sees a
+  // bare "[CONVEX A(auth:signIn)] Server Error" with no way to tell that the
+  // problem is a missing credential rather than their phone number.
+  const delivery = useQuery(api.authConfig.delivery, {});
+  // While unknown, keep the phone tab — it is the intended default — and only
+  // fall back once the server has said SMS is unavailable.
+  const smsReady = delivery?.phoneOtp !== false;
+  const emailReady = delivery?.emailOtp !== false;
+
+  // The worker's explicit choice, or null while they have not chosen. The
+  // effective method is derived rather than stored in an effect: until the
+  // server reports that SMS is unavailable we default to the phone, and once
+  // it does we fall back to email — without a state update cascading a render.
+  const [choice, setChoice] = useState<"phone" | "email" | null>(null);
+  const smsIsTheOnlyBrokenOne =
+    delivery?.phoneOtp === false && delivery?.emailOtp === true;
+  const method: "phone" | "email" =
+    choice ?? (smsIsTheOnlyBrokenOne ? "email" : "phone");
   // The code step holds whichever identifier the code was sent to, because
   // Convex Auth verifies the code against the identifier used to request it.
   const [step, setStep] = useState<"signIn" | { kind: "phone" | "email"; to: string }>(
@@ -232,18 +250,32 @@ function WorkerAuth() {
                   <h2 className="text-xl font-extrabold text-slate-900">
                     {t("wauth_title")}
                   </h2>
-                  <p className="mt-1 text-sm text-slate-500">{t("wauth_sub")}</p>
+                  <p className="mt-1 text-sm text-slate-500">
+                    {method === "phone" && smsReady
+                      ? t("wauth_sub")
+                      : t("wauth_email_sub")}
+                  </p>
                 </div>
+
+                {/* SMS is not deliverable on this deployment. Say so plainly
+                    and point at the method that does work, rather than letting
+                    the worker submit a phone number and meet a server error. */}
+                {!smsReady && (
+                  <div className="mx-6 mt-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs font-semibold text-amber-900">
+                    {t("wauth_sms_unavailable")}
+                  </div>
+                )}
 
                 {/* Method switch */}
                 <div className="mx-6 mt-4 grid grid-cols-2 gap-1 rounded-xl bg-slate-100 p-1">
                   <button
                     type="button"
                     onClick={() => {
-                      setMethod("phone");
+                      setChoice("phone");
                       setError(null);
                     }}
-                    className={`flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition ${
+                    disabled={!smsReady}
+                    className={`flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition disabled:cursor-not-allowed disabled:opacity-40 ${
                       method === "phone"
                         ? "bg-white text-teal-900 shadow-sm"
                         : "text-slate-500 hover:text-slate-700"
@@ -255,10 +287,11 @@ function WorkerAuth() {
                   <button
                     type="button"
                     onClick={() => {
-                      setMethod("email");
+                      setChoice("email");
                       setError(null);
                     }}
-                    className={`flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition ${
+                    disabled={!emailReady}
+                    className={`flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition disabled:cursor-not-allowed disabled:opacity-40 ${
                       method === "email"
                         ? "bg-white text-teal-900 shadow-sm"
                         : "text-slate-500 hover:text-slate-700"
@@ -414,7 +447,7 @@ function WorkerAuth() {
                         <button
                           type="button"
                           onClick={() => {
-                            setMethod("phone");
+                            setChoice("phone");
                             backToStart();
                           }}
                           className="font-bold text-teal-800 underline underline-offset-2"

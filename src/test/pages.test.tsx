@@ -195,6 +195,45 @@ describe("auth pages", () => {
     expect(document.querySelector('input[name="email"]')).toBeNull();
   });
 
+  it("does not offer SMS when this deployment cannot deliver it", () => {
+    // Regression: with no Vonage credentials the phone provider throws inside
+    // sendVerificationRequest, and that surfaces to the worker as a bare
+    // "[CONVEX A(auth:signIn)] Server Error" with no way to tell a missing
+    // credential from a bad phone number. The screen must say so up front.
+    seedCommon();
+    queryResults.set("authConfig:delivery", {
+      emailOtp: false,
+      phoneOtp: false,
+    });
+    renderPage(<WorkerAuth />, { route: "/login/worker" });
+    expect(screen.getByText(/text sign-in is not switched on/i)).toBeTruthy();
+    const phoneTab = screen.getByRole("button", { name: /mobile/i });
+    expect((phoneTab as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("falls back to email when SMS is the only unconfigured method", () => {
+    seedCommon();
+    queryResults.set("authConfig:delivery", {
+      emailOtp: true,
+      phoneOtp: false,
+    });
+    renderPage(<WorkerAuth />, { route: "/login/worker" });
+    // The worker must not be left staring at the one method that cannot work.
+    expect(document.querySelector('input[name="email"]')).not.toBeNull();
+    expect(document.querySelector('input[name="phone"]')).toBeNull();
+  });
+
+  it("keeps the phone tab when the deployment can deliver SMS", () => {
+    seedCommon();
+    queryResults.set("authConfig:delivery", {
+      emailOtp: true,
+      phoneOtp: true,
+    });
+    renderPage(<WorkerAuth />, { route: "/login/worker" });
+    expect(document.querySelector('input[name="phone"]')).not.toBeNull();
+    expect(screen.queryByText(/text sign-in is not switched on/i)).toBeNull();
+  });
+
   it("offers email as a second tab on the worker sign-in", () => {
     seedCommon();
     renderPage(<WorkerAuth />, { route: "/login/worker" });
