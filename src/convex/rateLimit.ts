@@ -48,6 +48,11 @@ export const LIMITS = {
   swap: { max: 5, windowMs: HOUR },
   /** Turning Safety Mode on or off. */
   safety: { max: 10, windowMs: DAY },
+  /** Opening a gateway checkout session. Every one of these creates a real
+   *  order on the payment provider, so it is an outward-facing cost, not just
+   *  a database write: a customer re-clicking "Pay" must not mint a hundred
+   *  unpaid orders. Generous enough for a genuine fumble or two. */
+  payment: { max: 8, windowMs: HOUR },
 } as const;
 
 export type RateLimitScope = keyof typeof LIMITS;

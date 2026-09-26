@@ -1,7 +1,8 @@
 /** @vitest-environment jsdom */
 import { beforeEach, describe, expect, it } from "vitest";
 import { screen } from "@testing-library/react";
-import { queryResults } from "./setup";
+import userEvent from "@testing-library/user-event";
+import { queryResults, mutationErrors } from "./setup";
 import { freshMocks, renderPage } from "./renderHarness";
 
 import Landing from "@/pages/Landing";
@@ -304,6 +305,37 @@ describe("authenticated portals", () => {
     });
     renderPage(<Welfare />, { route: "/welfare" });
     expect(document.body.textContent?.length ?? 0).toBeGreaterThan(80);
+  });
+
+  it("tells the officer when the server refuses an action", async () => {
+    seedCommon();
+    // A pending worker, and a server that refuses the review — exactly what a
+    // scoped federation admin hits when they touch another federation's work.
+    queryResults.set("admin:verificationQueue", [
+      {
+        _id: "a1",
+        fullName: "Ramesh",
+        trade: "electrician",
+        district: "Kurnool",
+        idType: "aadhaar",
+        idLast4: "1234",
+        phone: "9000000000",
+        experienceYears: 5,
+        dailyRate: 800,
+        kycStatus: "pending",
+      },
+    ]);
+    mutationErrors.set("admin:reviewKyc", "Not in your federation");
+
+    const user = userEvent.setup();
+    renderPage(<Admin />, { route: "/admin" });
+    // The KYC queue lives behind its own tab.
+    await user.click(screen.getByRole("button", { name: /KYC Queue/i }));
+    const approve = screen.getAllByRole("button", { name: /approve/i })[0];
+    await user.click(approve);
+
+    // The refusal must be visible, not a silent no-op.
+    expect(await screen.findByText("Not in your federation")).toBeTruthy();
   });
 
   it("renders the super-admin platform console", () => {

@@ -7,7 +7,7 @@ import {
   QueryCtx,
   MutationCtx,
 } from "./_generated/server";
-import { isAdminUser, requireUser } from "./identity";
+import { isAdminUser, requireUser, adminSocietyScope, bookingInScope } from "./identity";
 import { consume } from "./rateLimit";
 import { parseCustomServiceId } from "./customServices";
 import { Doc, Id } from "./_generated/dataModel";
@@ -313,7 +313,15 @@ export const listForAdmin = query({
   handler: async (ctx) => {
     const userId = await requireUser(ctx);
     if (!(await isAdminUser(ctx, userId))) throw new Error("Forbidden");
-    return await ctx.db.query("bookings").order("desc").take(200);
+    // A federation admin sees their own federation's jobs, plus the unassigned
+    // dispatch pool that every federation's workers accept from.
+    const scope = await adminSocietyScope(ctx, userId);
+    const all = await ctx.db.query("bookings").order("desc").take(200);
+    const out = [];
+    for (const b of all) {
+      if (await bookingInScope(ctx, b, scope)) out.push(b);
+    }
+    return out;
   },
 });
 
@@ -570,12 +578,13 @@ export const findByGatewayOrder = internalQuery({
       .unique();
     return b?._id ?? null;
   },
-});
-
-export const attachGatewayOrder = mutation({
+});  export const attachGatewayOrder = mutation({
     args: { id: v.id("bookings"), rpOrderId: v.string() },
     handler: async (ctx, args) => {
       const userId = await requireUser(ctx);
+      // Reaching here means a real order exists on the payment provider, so
+      // the budget is spent before the row is touched.
+      await consume(ctx, "payment", userId);
       const b = await ctx.db.get(args.id);
       if (!b) throw new Error("Booking not found");
       if (!(await canSeeBooking(ctx, userId, b))) {

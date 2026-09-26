@@ -22,6 +22,13 @@ export const queryResults = new Map<string, unknown>();
 /** Mutations the page called, as `"module.function"` → argument list. */
 export const mutationCalls: { path: string; args: unknown }[] = [];
 
+/**
+ * Errors a mutation should reject with, keyed by `"module.function"`. Lets a
+ * render test exercise the "the server refused this" path — which is how a
+ * scoped federation admin finds out they touched another federation's work.
+ */
+export const mutationErrors = new Map<string, string>();
+
 /** Values actions resolve to during a render test, keyed by `"module.function"`. */
 export const actionResults = new Map<string, unknown>();
 
@@ -31,6 +38,7 @@ export const actionCalls: { path: string; args: unknown }[] = [];
 export function resetConvexMocks() {
   queryResults.clear();
   mutationCalls.length = 0;
+  mutationErrors.clear();
   actionResults.clear();
   actionCalls.length = 0;
 }
@@ -55,6 +63,8 @@ vi.mock("convex/react", () => {
     const path = pathOf(ref);
     return async (args: unknown) => {
       mutationCalls.push({ path, args });
+      const err = mutationErrors.get(path);
+      if (err) throw new Error(err);
       return undefined;
     };
   };

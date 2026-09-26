@@ -20,6 +20,7 @@ import {
   seedWorker,
   seedArtisan,
   seedAdmin,
+  seedBooking,
   type Id,
 } from "./convexHarness";
 
@@ -295,6 +296,237 @@ describe("federation scoping: admins see only their own workers", () => {
         approve: true,
       }),
     ).rejects.toThrow("Not in your federation");
+  });
+});
+
+describe("federation scoping: the isolation covers every privileged operation", () => {
+  /**
+   * Two federations, one completed job each, and one pending work sample +
+   * listing each — then a battery of cross-federation attempts from admin A.
+   * Each of these was a real leak at some point: the tier was introduced with
+   * scoping on three functions and none of the rest.
+   */
+  async function twoFederations(t: ReturnType<typeof setupTest>) {
+    const p = await platform(t);
+    await appointBoth(t, p);
+
+    const wA = await seedWorker(t, { email: "ops-a@example.com", name: "OpsA" });
+    const artA = await seedArtisan(t, wA.id, {
+      trade: "electrician",
+      societyId: p.fedA,
+      kycStatus: "pending",
+    });
+    const wB = await seedWorker(t, { email: "ops-b@example.com", name: "OpsB" });
+    const artB = await seedArtisan(t, wB.id, {
+      trade: "mason",
+      societyId: p.fedB,
+      kycStatus: "pending",
+    });
+
+    // A settled job for federation B: the money dashboards must not show it
+    // to admin A.
+    const custB = await seedCustomer(t, { email: "cust-b@example.com" });
+    const bookingB = await seedBooking(t, custB.id, {
+      workerId: artB,
+      workerUserId: wB.id,
+      status: "settled",
+    });
+    return { ...p, wA, artA, wB, artB, bookingB };
+  }
+
+  it("keeps another federation's revenue out of the dashboards and ledger", async () => {
+    const t = setupTest();
+    const f = await twoFederations(t);
+    const asA = t.withIdentity({ subject: f.adminA });
+
+    const overview = await asA.query(api.admin.overview);
+    expect(overview.revenueSettled).toBe(0); // only B had a settled job
+    expect(overview.welfarePool).toBe(0);
+
+    const ledger = await asA.query(api.admin.earningsLedger);
+    expect(ledger).toEqual([]);
+
+    // The platform-tier view still counts it.
+    const asSuper = t.withIdentity({ subject: f.superAdmin });
+    expect((await asSuper.query(api.admin.overview)).revenueSettled).toBeGreaterThan(0);
+  });
+
+  it("keeps another federation's bookings out of the admin booking list", async () => {
+    const t = setupTest();
+    const f = await twoFederations(t);
+    const listed = await t
+      .withIdentity({ subject: f.adminA })
+      .query(api.bookings.listForAdmin);
+    expect(listed.map((b) => b._id)).not.toContain(f.bookingB);
+  });
+
+  it("refuses to cancel another federation's booking", async () => {
+    const t = setupTest();
+    const f = await twoFederations(t);
+    // A booking still in flight, so the cancel is refused for the right reason
+    // (not because it is already closed).
+    const cust = await seedCustomer(t, { email: "live-b@example.com" });
+    const liveB = await seedBooking(t, cust.id, {
+      workerId: f.artB,
+      workerUserId: f.wB.id,
+      status: "inprogress",
+    });
+    await expect(
+      t.withIdentity({ subject: f.adminA }).mutation(api.admin.adminCancelBooking, {
+        id: liveB,
+      }),
+    ).rejects.toThrow("Not in your federation");
+  });
+
+  it("refuses to remove another federation's worker", async () => {
+    const t = setupTest();
+    const f = await twoFederations(t);
+    await expect(
+      t.withIdentity({ subject: f.adminA }).mutation(api.workerAdmin.removeWorker, {
+        artisanId: f.artB,
+        note: "not my federation",
+      }),
+    ).rejects.toThrow("Not in your federation");
+    // …and the worker is still on the radar.
+    expect((await t.run((ctx) => ctx.db.get(f.artB)))?.removedAt).toBeUndefined();
+  });
+
+  it("refuses to verify work evidence belonging to another federation", async () => {
+    const t = setupTest();
+    const f = await twoFederations(t);
+    const storageId = await t.run(async (ctx) =>
+      ctx.storage.store(new Blob([new Uint8Array(500).fill(9)])),
+    );
+    const sampleId = await t.withIdentity({ subject: f.wB.id }).mutation(
+      api.workSamples.completeUpload,
+      { storageId, mimeType: "image/png" },
+    );
+
+    const asA = t.withIdentity({ subject: f.adminA });
+    // The queue is filtered…
+    expect(await asA.query(api.workSamples.reviewQueue)).toEqual([]);
+    // …and the direct call is refused, even with a valid storage id.
+    await expect(
+      asA.mutation(api.workSamples.reviewSample, { sampleId, approve: true }),
+    ).rejects.toThrow("Not in your federation");
+  });
+
+  it("refuses to approve another federation's worker listing", async () => {
+    const t = setupTest();
+    const f = await twoFederations(t);
+    const serviceId = await t.withIdentity({ subject: f.wB.id }).mutation(
+      api.customServices.create,
+      {
+        name: "Mason work",
+        description: "Stone work",
+        category: "mason",
+        isCustomCategory: false,
+        base: 400,
+      },
+    );
+
+    const asA = t.withIdentity({ subject: f.adminA });
+    expect(await asA.query(api.customServices.reviewQueue)).toEqual([]);
+    await expect(
+      asA.mutation(api.customServices.review, { serviceId, approve: true }),
+    ).rejects.toThrow("Not in your federation");
+  });
+
+  it("refuses to arbitrate a dispute about another federation's job", async () => {
+    const t = setupTest();
+    const f = await twoFederations(t);
+    const disputeId = await t.withIdentity({ subject: f.wB.id }).mutation(
+      api.disputes.raise,
+      { bookingId: f.bookingB, category: "quality", details: "poor finish" },
+    );
+
+    const asA = t.withIdentity({ subject: f.adminA });
+    expect(await asA.query(api.disputes.listForAdmin)).toEqual([]);
+    await expect(
+      asA.mutation(api.disputes.resolve, { id: disputeId, status: "resolved" }),
+    ).rejects.toThrow("Not in your federation");
+  });
+
+  it("cannot charter, review or suspend federations", async () => {
+    const t = setupTest();
+    const p = await platform(t);
+    await appointBoth(t, p);
+    const asA = t.withIdentity({ subject: p.adminA });
+
+    await expect(
+      asA.mutation(api.societies.register, {
+        name: "Rogue Federation",
+        district: "Kurnool",
+        state: "Andhra Pradesh",
+      }),
+    ).rejects.toThrow("Only platform officers can manage federations");
+
+    await expect(
+      asA.mutation(api.societies.review, { id: p.fedB, status: "suspended" }),
+    ).rejects.toThrow("Only platform officers can manage federations");
+    // B is untouched.
+    expect((await t.run((ctx) => ctx.db.get(p.fedB)))?.status).toBe("active");
+
+    // A scoped admin's society list is their own federation only.
+    const feds = await asA.query(api.societies.listForAdmin);
+    expect(feds.map((f) => f._id)).toEqual([p.fedA]);
+
+    // The platform tier can still do both.
+    const asSuper = t.withIdentity({ subject: p.superAdmin });
+    await asSuper.mutation(api.societies.review, { id: p.fedB, status: "suspended" });
+    expect((await t.run((ctx) => ctx.db.get(p.fedB)))?.status).toBe("suspended");
+  });
+
+  it("cannot enroll a worker into another federation", async () => {
+    const t = setupTest();
+    const p = await platform(t);
+    await appointBoth(t, p);
+    const member = await seedCustomer(t, { email: "newcomer@example.com" });
+
+    // Admin A may add into their own federation…
+    await t.withIdentity({ subject: p.adminA }).mutation(api.workerAdmin.addWorker, {
+      userId: member.id,
+      fullName: "Newcomer",
+      phone: "9000000000",
+      trade: "electrician",
+      district: "Kurnool",
+      state: "Andhra Pradesh",
+      societyId: p.fedA,
+      experienceYears: 2,
+      dailyRate: 700,
+    });
+    // …but not into federation B, whatever the request claims.
+    await expect(
+      t.withIdentity({ subject: p.adminA }).mutation(api.workerAdmin.addWorker, {
+        userId: member.id,
+        fullName: "Newcomer",
+        phone: "9000000000",
+        trade: "electrician",
+        district: "Nandyal",
+        state: "Andhra Pradesh",
+        societyId: p.fedB,
+        experienceYears: 2,
+        dailyRate: 700,
+      }),
+    ).rejects.toThrow("You can only add workers to your own federation");
+  });
+
+  it("an UNSCOPED officer keeps the whole-network view (no lockout regression)", async () => {
+    // seedAdmin makes a role:"admin" user with no societyId — the owner and the
+    // legacy seeded admins are in this shape. Scoping must not blind them.
+    const t = setupTest();
+    const legacy = await seedAdmin(t, { email: "legacy.board@sahakar.demo" });
+    const as = t.withIdentity({ subject: legacy.id });
+
+    expect(await as.query(api.admin.amAdmin)).toBe(true);
+    expect(await as.query(api.admin.workerDirectory)).toHaveLength(0);
+    await expect(
+      as.mutation(api.societies.register, {
+        name: "Legacy Society",
+        district: "Kurnool",
+        state: "Andhra Pradesh",
+      }),
+    ).resolves.toBeTruthy();
   });
 });
 

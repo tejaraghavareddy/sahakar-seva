@@ -86,6 +86,27 @@ describe("bookings:attachGatewayOrder", () => {
     });
     expect((await bookingRow(t, bookingId)).rpOrderId).toBe("order_xyz");
   });
+
+  it("caps how many checkout sessions a customer can open", async () => {
+    // Every one of these corresponds to a real order on the payment provider,
+    // so re-clicking "Pay" must not mint an unbounded pile of them.
+    const t = setupTest();
+    const { id, as } = await seedCustomer(t);
+    const bookingId = await seedBooking(t, id, { status: "payment" });
+
+    for (let i = 0; i < 8; i++) {
+      await as.mutation(api.bookings.attachGatewayOrder, {
+        id: bookingId,
+        rpOrderId: `order_${i}`,
+      });
+    }
+    await expect(
+      as.mutation(api.bookings.attachGatewayOrder, {
+        id: bookingId,
+        rpOrderId: "order_8",
+      }),
+    ).rejects.toThrow("Too many attempts");
+  });
 });
 
 describe("bookings:findByGatewayOrder", () => {

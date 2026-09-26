@@ -1,5 +1,5 @@
 import { Link } from "react-router";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
@@ -45,6 +45,38 @@ const TABS: Array<{ id: TabId; label: string; icon: typeof Users }> = [
   { id: "disputes", label: "Disputes", icon: ShieldAlert },
   { id: "audit", label: "Security Audit", icon: ScrollText },
 ];
+
+/* ── shared error surface ──
+ *
+ * Federation admins are now scoped to their own federation, so the server
+ * legitimately refuses several of these actions ("Not in your federation",
+ * "Only platform officers can manage federations"). A rejected mutation with
+ * no catch is a silent no-op: the spinner stops and the officer is told
+ * nothing. Every refusal is surfaced instead, using the same inline pattern
+ * the rest of this console already uses.
+ */
+function useActionErrors() {
+  const [actionError, setActionError] = useState<string | null>(null);
+  const reportError = useCallback(
+    (e: unknown, fallback: string) =>
+      setActionError(e instanceof Error ? e.message : fallback),
+    [],
+  );
+  return { actionError, setActionError, reportError };
+}
+
+/** Inline banner for a refused action. */
+function ActionError({ message }: { message: string | null }) {
+  if (!message) return null;
+  return (
+    <p
+      role="alert"
+      className="mb-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700"
+    >
+      {message}
+    </p>
+  );
+}
 
 export default function Admin() {
   const { t } = useLang();
@@ -269,7 +301,7 @@ function OverviewPanel({
               </MonoBadge>
               <span className="text-xs font-bold text-slate-900">₹{b.total}</span>
               {!["completed", "settled", "cancelled"].includes(b.status) && (
-                <button type="button" onClick={() => void adminCancel({ id: b._id })} className="rounded-xl border border-rose-200 bg-rose-50 px-2.5 py-1 text-[11px] font-bold text-rose-700 transition hover:bg-rose-100">
+                <button type="button" onClick={() => void adminCancel({ id: b._id }).catch(() => {})} className="rounded-xl border border-rose-200 bg-rose-50 px-2.5 py-1 text-[11px] font-bold text-rose-700 transition hover:bg-rose-100">
                   {t("ad_cancel")}
                 </button>
               )}
@@ -455,11 +487,14 @@ function GovernancePanel() {
   const queue = useQuery(api.admin.verificationQueue, {});
   const reviewKyc = useMutation(api.admin.reviewKyc);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const { actionError, setActionError } = useActionErrors();
 
   async function handleReview(artisanId: Id<"artisans">, approve: boolean) {
     setBusyId(artisanId);
     try {
       await reviewKyc({ artisanId, approve });
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : "Could not review this worker");
     } finally {
       setBusyId(null);
     }
@@ -470,6 +505,7 @@ function GovernancePanel() {
       <div className="mb-4 flex items-center gap-3">
         <span className="flex size-9 items-center justify-center rounded-xl bg-emerald-600 text-white">            <ShieldCheck className="size-4" />
         </span>
+        <ActionError message={actionError} />
         <div>
           <h2 className="text-base font-extrabold text-slate-900">Artisan Verification Queue</h2>
           <p className="text-xs text-slate-500">Review identity documents and approve artisan registrations</p>
@@ -548,10 +584,12 @@ function SocietiesPanel() {
   const [hq, setHq] = useState<{ lat: number; lng: number; address: string } | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const { actionError, setActionError } = useActionErrors();
 
   async function handleRegister() {
     if (!name.trim() || !district.trim()) return;
     setBusy(true);
+    setActionError(null);
     try {
       await register({
         name: name.trim(),
@@ -575,7 +613,13 @@ function SocietiesPanel() {
   }
 
   async function handleSocietyReview(id: Id<"societies">, status: string) {
-    await review({ id, status });
+    try {
+      await review({ id, status });
+    } catch (e) {
+      setActionError(
+        e instanceof Error ? e.message : "Could not update this federation",
+      );
+    }
   }
 
   const STATES = ["Telangana", "Andhra Pradesh", "Karnataka", "Tamil Nadu", "Kerala", "Maharashtra", "Delhi", "West Bengal", "Uttar Pradesh", "Gujarat", "Rajasthan"];
@@ -585,6 +629,7 @@ function SocietiesPanel() {
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <span className="flex size-9 items-center justify-center rounded-xl bg-emerald-600 text-white">
+          <ActionError message={actionError} />
             <Building2 className="size-4" />
           </span>
           <div>
@@ -837,6 +882,7 @@ function DisputesPanel() {
   const resolve = useMutation(api.disputes.resolve);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [notes, setNotes] = useState<Record<string, string>>({});
+  const { actionError, setActionError } = useActionErrors();
 
   async function handleResolve(
     id: Id<"disputes">,
@@ -845,6 +891,8 @@ function DisputesPanel() {
     setBusyId(id);
     try {
       await resolve({ id, status, resolution: notes[id] });
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : "Could not resolve this dispute");
     } finally {
       setBusyId(null);
     }
@@ -855,6 +903,7 @@ function DisputesPanel() {
       <div className="mb-4 flex items-center gap-3">
         <span className="flex size-9 items-center justify-center rounded-xl bg-rose-600 text-white">
           <ShieldAlert className="size-4" />
+          <ActionError message={actionError} />
         </span>
         <div>
           <h2 className="text-base font-extrabold text-slate-900">
@@ -1011,6 +1060,7 @@ function SkillReviewPanel() {
   const reviewSample = useMutation(api.workSamples.reviewSample);
   const reviewKyc = useMutation(api.workSamples.reviewKycFromSkillTab);
   const [busy, setBusy] = useState<string | null>(null);
+  const { actionError, setActionError } = useActionErrors();
   const [rejecting, setRejecting] = useState<string | null>(null);
   const [note, setNote] = useState("");
   const [zoom, setZoom] = useState<string | null>(null);
@@ -1032,6 +1082,7 @@ function SkillReviewPanel() {
 
   return (
     <div className="space-y-5">
+      <ActionError message={actionError} />
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
         <StatTile icon={<Camera className="size-3.5" />} label="Samples awaiting review" value={String(queue.length)} tone="orange" />
         <StatTile icon={<ShieldCheck className="size-3.5" />} label="With KYC pending too" value={String(queue.filter((q) => q.kycStatus !== "verified").length)} />
@@ -1105,7 +1156,16 @@ function SkillReviewPanel() {
                       <button
                         type="button"
                         disabled={busy === s._id}
-                        onClick={() => void reviewKyc({ artisanId: s.artisanId, approve: true })}
+                        onClick={() =>
+                          void reviewKyc({ artisanId: s.artisanId, approve: true }).catch(
+                            (e) =>
+                              setActionError(
+                                e instanceof Error
+                                  ? e.message
+                                  : "Could not verify KYC",
+                              ),
+                          )
+                        }
                         className="flex items-center gap-1 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-[11px] font-bold text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-50"
                       >
                         <ShieldCheck className="size-3" /> Also verify KYC
