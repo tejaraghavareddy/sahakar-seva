@@ -5,7 +5,7 @@ import { api } from "@/convex/_generated/api";
 import { useAuth } from "@/hooks/use-auth";
 import { LanguagePicker } from "@/components/terminal";
 import LocationPickerModal from "@/components/map/LocationPickerModal";
-import { useDetectedLocation, formatAccuracy } from "@/lib/useLocation";
+import { useDetectedLocation, formatAccuracy, isUnreliable } from "@/lib/useLocation";
 import {
   CalendarClock,
   HardHat,
@@ -26,6 +26,8 @@ export function AppHeader() {
   // Platform-tier link renders only for super admins.
   const amSuper = useQuery(api.superAdmin.amSuperAdmin, {}) === true;
   const { location, setManual } = useDetectedLocation();
+  // A placeholder or coarse fix must not be dressed up as a live GPS lock.
+  const unreliable = isUnreliable(location);
   const [pickerOpen, setPickerOpen] = useState(false);
 
   const links = [
@@ -77,15 +79,37 @@ export function AppHeader() {
             type="button"
             onClick={() => setPickerOpen(true)}
             title="Change service location"
-            className="hidden max-w-[16rem] items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-700 shadow-xs transition hover:border-emerald-300 hover:text-emerald-800 sm:inline-flex"
+            className={`hidden max-w-[16rem] items-center gap-1.5 rounded-full border bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-700 shadow-xs transition sm:inline-flex ${
+              unreliable
+                ? "border-amber-200 hover:border-amber-400 hover:text-amber-800"
+                : "border-slate-200 hover:border-emerald-300 hover:text-emerald-800"
+            }`}
           >
             <span className="relative flex size-2 shrink-0">
-              <span className="absolute inline-flex size-2 animate-ping rounded-full bg-emerald-400 opacity-75" />
-              <span className="relative inline-flex size-2 rounded-full bg-emerald-500" />
+              <span
+                className={`absolute inline-flex size-2 animate-ping rounded-full opacity-75 ${
+                  unreliable ? "bg-amber-400" : "bg-emerald-400"
+                }`}
+              />
+              <span
+                className={`relative inline-flex size-2 rounded-full ${
+                  unreliable ? "bg-amber-500" : "bg-emerald-500"
+                }`}
+              />
             </span>
-            <MapPin className="size-3 shrink-0 text-emerald-600" />
+            <MapPin
+              className={`size-3 shrink-0 ${unreliable ? "text-amber-600" : "text-emerald-600"}`}
+            />
             <span className="truncate">{location.label}</span>
-            <span className="shrink-0 rounded border border-emerald-200 bg-emerald-50 px-1 text-[10px] font-bold text-emerald-700">
+            {/* An approximate position is amber, not green: the pulse next to it
+                is a live-GPS signal and must not imply a real fix. */}
+            <span
+              className={`shrink-0 rounded border px-1 text-[10px] font-bold ${
+                unreliable
+                  ? "border-amber-200 bg-amber-50 text-amber-800"
+                  : "border-emerald-200 bg-emerald-50 text-emerald-700"
+              }`}
+            >
               {formatAccuracy(location)}
             </span>
           </button>

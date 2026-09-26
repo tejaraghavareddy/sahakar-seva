@@ -4,6 +4,11 @@ import {
   formatDistance,
   haversine,
   reverseGeocode,
+  classifyAccuracy,
+  isPlausibleFix,
+  getAccuratePosition,
+  clearGeocodeCache,
+  GeolocationError,
 } from "./geo";
 
 function okJson(body: unknown) {
@@ -12,6 +17,9 @@ function okJson(body: unknown) {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  // The reverse-geocode cache is module-level, so it would otherwise leak
+  // between cases and mask a fetch that should have happened.
+  clearGeocodeCache();
 });
 
 describe("reverseGeocode — detailed address assembly", () => {
@@ -166,5 +174,133 @@ describe("distance + ETA math behind the availability pills", () => {
     expect(formatDistance(850)).toBe("850 m");
     expect(formatDistance(2_300)).toBe("2.3 km");
     expect(formatDistance(190_700)).toBe("191 km");
+  });
+});
+
+/* ── GPS fix quality: the difference between "your location" and a guess ── */
+
+describe("classifyAccuracy", () => {
+  it("bands a reported accuracy into a trust level", () => {
+    expect(classifyAccuracy(8)).toBe("precise"); // street-level
+    expect(classifyAccuracy(25)).toBe("precise");
+    expect(classifyAccuracy(60)).toBe("fair"); // still fine to dispatch
+    expect(classifyAccuracy(300)).toBe("coarse"); // block-level, say so
+    expect(classifyAccuracy(1500)).toBe("none"); // worse than a district
+  });
+
+  it("treats a missing or nonsensical accuracy as unknown", () => {
+    expect(classifyAccuracy(undefined)).toBe("none");
+    expect(classifyAccuracy(0)).toBe("none");
+    expect(classifyAccuracy(-5)).toBe("none");
+    expect(classifyAccuracy(Number.NaN)).toBe("none");
+  });
+});
+
+describe("isPlausibleFix — rejects the fixes that lie", () => {
+  it("accepts a real Kurnool fix", () => {
+    expect(isPlausibleFix(15.83, 78.03, 12)).toBe(true);
+    expect(isPlausibleFix(28.61, 77.21, 800)).toBe(true); // Delhi, coarse but real
+  });
+
+  it("rejects Null Island, which is what a device with no lock reports", () => {
+    // (0,0) reverse-geocodes to open water in the South Atlantic. Accepting it
+    // means a confident nonsense address and "no workers near you".
+    expect(isPlausibleFix(0, 0, 20)).toBe(false);
+  });
+
+  it("rejects NaN, infinities and out-of-range coordinates", () => {
+    expect(isPlausibleFix(Number.NaN, 78, 10)).toBe(false);
+    expect(isPlausibleFix(15, Number.POSITIVE_INFINITY, 10)).toBe(false);
+    expect(isPlausibleFix(91, 78, 10)).toBe(false);
+    expect(isPlausibleFix(15, 181, 10)).toBe(false);
+  });
+
+  it("rejects a fix far outside the service area", () => {
+    expect(isPlausibleFix(48.85, 2.35, 20)).toBe(false); // Paris
+  });
+
+  it("rejects a fix too coarse to dispatch on", () => {
+    expect(isPlausibleFix(15.83, 78.03, 2001)).toBe(false);
+    expect(isPlausibleFix(15.83, 78.03, 0)).toBe(false);
+  });
+});
+
+/** A scriptable navigator.geolocation. */
+function stubGeolocation(script: {
+  getCurrent?: (ok: PositionCallback) => void;
+  watch?: (ok: PositionCallback) => void;
+  watchError?: GeolocationPositionError;
+  getError?: GeolocationPositionError;
+}) {
+  const cleared: number[] = [];
+  let watchId = 7;
+  vi.stubGlobal("navigator", {
+    geolocation: {
+      getCurrentPosition: (ok: PositionCallback, err?: PositionErrorCallback | null) => {
+        if (script.getError && err) err(script.getError);
+        else script.getCurrent?.(ok);
+      },
+      watchPosition: (ok: PositionCallback, err?: PositionErrorCallback | null) => {
+        watchId = 7;
+        if (script.watchError && err) err(script.watchError);
+        else script.watch?.(ok);
+        return watchId;
+      },
+      clearWatch: (id: number) => cleared.push(id),
+    },
+  });
+  return cleared;
+}
+
+function fix(accuracy: number, lat = 15.83, lng = 78.03) {
+  return {
+    coords: { accuracy, latitude: lat, longitude: lng },
+    timestamp: Date.now(),
+  } as unknown as GeolocationPosition;
+}
+
+const denied = { code: 1, message: "User denied Geolocation" } as GeolocationPositionError;
+
+describe("getAccuratePosition", () => {
+  it("stops at the target accuracy and releases the watcher", async () => {
+    const cleared = stubGeolocation({
+      watch: (ok) => {
+        ok(fix(400));
+        ok(fix(18)); // good enough
+      },
+      getCurrent: (ok) => ok(fix(300)),
+    });
+
+    const pos = await getAccuratePosition(1000);
+    expect(pos.coords.accuracy).toBe(18);
+    // The whole point of the fix: a denial used to leave the watch running.
+    expect(cleared).toContain(7);
+  });
+
+  it("keeps the best reading when the budget runs out", async () => {
+    stubGeolocation({
+      watch: (ok) => ok(fix(400)),
+      getCurrent: (ok) => ok(fix(120)),
+    });
+
+    const pos = await getAccuratePosition(30); // expires almost immediately
+    expect(pos.coords.accuracy).toBeLessThanOrEqual(400);
+  });
+
+  it("rejects a Null Island fix instead of reporting open water", async () => {
+    stubGeolocation({
+      watch: (ok) => ok(fix(20, 0, 0)),
+      getCurrent: (ok) => ok(fix(20, 0, 0)),
+    });
+
+    await expect(getAccuratePosition(30)).rejects.toBeInstanceOf(GeolocationError);
+  });
+
+  it("fails fast on a permission denial and still clears the watcher", async () => {
+    const cleared = stubGeolocation({ watchError: denied, getError: denied });
+    const err = await getAccuratePosition(5000).catch((e) => e);
+    expect(err).toBeInstanceOf(GeolocationError);
+    expect((err as GeolocationError).code).toBe("denied");
+    expect(cleared).toContain(7);
   });
 });

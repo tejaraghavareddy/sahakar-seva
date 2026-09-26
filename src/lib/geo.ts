@@ -52,53 +52,166 @@ export function accuracyText(metres: number): string {
   return `±${Math.round(metres / 10) * 10} m`;
 }
 
+/** How much a fix can be trusted — drives both acceptance and the UI wording. */
+export type FixQuality = "precise" | "fair" | "coarse" | "none";
+
+/** Street-level accuracy: what we aim for before stopping early. */
+export const ACCURACY_GOOD_M = 25;
+/** Still fine for dispatch and nearby-worker search. */
+export const ACCURACY_FAIR_M = 100;
+/** Block-level. Usable, but the UI must say so. */
+export const ACCURACY_POOR_M = 500;
+/** Worse than a district — no useful dispatch decision can be made from it. */
+export const ACCURACY_REJECT_M = 2000;
+
+/** Bucket a reported accuracy (metres) into a trust level. */
+export function classifyAccuracy(accuracyM?: number): FixQuality {
+  if (accuracyM === undefined || !Number.isFinite(accuracyM) || accuracyM <= 0) {
+    return "none";
+  }
+  if (accuracyM <= ACCURACY_GOOD_M) return "precise";
+  if (accuracyM <= ACCURACY_FAIR_M) return "fair";
+  if (accuracyM <= ACCURACY_POOR_M) return "coarse";
+  return "none";
+}
+
 /**
- * Get the most accurate GPS fix available: starts with getCurrentPosition,
- * then keeps the best reading from watchPosition until accuracy ≤ 25 m
- * or the timeout expires. Much more accurate than a single fix, which is
- * often a cached low-precision network location.
+ * Reject fixes that are not real positions.
+ *
+ * A browser with no GPS lock often reports (0, 0) — "Null Island", in the
+ * South Atlantic. Accepting it makes the app reverse-geocode open water,
+ * show a confident nonsense address, and report "no workers near you".
+ * The bounding box is generous (India plus a wide margin) and exists to catch
+ * a broken provider, not to second-guess a member who travels.
  */
-export function getAccuratePosition(timeoutMs = 12000): Promise<GeolocationPosition> {
+export function isPlausibleFix(
+  lat: number,
+  lng: number,
+  accuracyM?: number,
+): boolean {
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return false;
+  if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return false;
+  if (lat === 0 && lng === 0) return false; // Null Island
+  if (lat < 5 || lat > 38 || lng < 66 || lng > 100) return false; // outside India + margin
+  if (accuracyM !== undefined) {
+    if (!Number.isFinite(accuracyM) || accuracyM <= 0) return false;
+    if (accuracyM > ACCURACY_REJECT_M) return false; // useless for dispatch
+  }
+  return true;
+}
+
+/** Why a location request failed, so the UI can say something useful. */
+export type LocationFailure = "denied" | "unavailable" | "timeout" | "no-fix";
+
+export class GeolocationError extends Error {
+  readonly code: LocationFailure;
+  constructor(code: LocationFailure, message: string) {
+    super(message);
+    this.name = "GeolocationError";
+    this.code = code;
+  }
+}
+
+/**
+ * Get the most accurate GPS fix available.
+ *
+ * Subscribes to watchPosition *first* so a good reading is never lost while
+ * the one-shot getCurrentPosition is still resolving, keeps the best reading
+ * until the target accuracy is reached or the budget runs out, and — the part
+ * that used to be missing — releases the watcher and timer on every exit path.
+ * An earlier version left the watch running after a permission denial, so the
+ * device kept GPS hot for the rest of the session with nobody listening.
+ */
+export function getAccuratePosition(
+  timeoutMs = 12000,
+  targetM = ACCURACY_GOOD_M,
+): Promise<GeolocationPosition> {
   return new Promise((resolve, reject) => {
     if (typeof navigator === "undefined" || !navigator.geolocation) {
-      reject(new Error("Geolocation unsupported"));
+      reject(new GeolocationError("unavailable", "Geolocation unsupported"));
       return;
     }
+
     let best: GeolocationPosition | null = null;
+    let watchId: number | null = null;
+    let timer: ReturnType<typeof setTimeout> | null = null;
     let settled = false;
-    const finishOk = () => {
-      if (settled) return;
-      settled = true;
-      if (best) resolve(best);
-      else reject(new Error("No GPS fix"));
-    };
-    const finishErr = (err: unknown) => {
-      if (settled) return;
-      settled = true;
-      reject(err);
-    };
-    const consider = (p: GeolocationPosition) => {
-      if (!best || p.coords.accuracy < best.coords.accuracy) best = p;
-      if (best.coords.accuracy <= 25) {
-        navigator.geolocation.clearWatch(watchId);
+
+    const cleanup = () => {
+      if (watchId !== null) {
+        try {
+          navigator.geolocation.clearWatch(watchId);
+        } catch {
+          /* already gone */
+        }
+        watchId = null;
+      }
+      if (timer !== null) {
         clearTimeout(timer);
-        finishOk();
+        timer = null;
       }
     };
-    navigator.geolocation.getCurrentPosition(consider, finishErr, {
+
+    // A cached (or stubbed) geolocation source can call back synchronously —
+    // i.e. before watchId/timer below are assigned — so a settle that happens
+    // mid-setup would leak the watcher. Re-run cleanup after each handle is
+    // handed to us; it is a no-op until something is actually registered.
+    const releaseIfSettled = () => {
+      if (settled) cleanup();
+    };
+
+    const succeed = () => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      if (
+        best &&
+        isPlausibleFix(best.coords.latitude, best.coords.longitude, best.coords.accuracy)
+      ) {
+        resolve(best);
+      } else {
+        reject(new GeolocationError("no-fix", "No usable GPS fix"));
+      }
+    };
+
+    const fail = (code: LocationFailure, message: string) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(new GeolocationError(code, message));
+    };
+
+    const consider = (p: GeolocationPosition) => {
+      // Ignore junk readings outright; a bad one must never become "best".
+      if (!isPlausibleFix(p.coords.latitude, p.coords.longitude, p.coords.accuracy)) {
+        return;
+      }
+      if (!best || p.coords.accuracy < best.coords.accuracy) best = p;
+      if (best.coords.accuracy <= targetM) succeed();
+    };
+
+    const onError = (err: GeolocationPositionError | null) => {
+      // Permission denial and hard failures will not improve with waiting, so
+      // stop immediately rather than burning the whole budget.
+      const code: LocationFailure =
+        err?.code === 1 ? "denied" : err?.code === 3 ? "timeout" : "unavailable";
+      fail(code, err?.message || "Location unavailable");
+    };
+
+    watchId = navigator.geolocation.watchPosition(consider, onError, {
       enableHighAccuracy: true,
       timeout: timeoutMs,
       maximumAge: 0,
     });
-    const watchId = navigator.geolocation.watchPosition(
-      consider,
-      () => {},
-      { enableHighAccuracy: true, timeout: timeoutMs, maximumAge: 0 },
-    );
-    const timer = setTimeout(() => {
-      navigator.geolocation.clearWatch(watchId);
-      finishOk();
-    }, timeoutMs);
+    releaseIfSettled();
+    navigator.geolocation.getCurrentPosition(consider, onError, {
+      enableHighAccuracy: true,
+      timeout: timeoutMs,
+      maximumAge: 0,
+    });
+    releaseIfSettled();
+    timer = setTimeout(succeed, timeoutMs);
+    releaseIfSettled();
   });
 }
 
@@ -128,19 +241,52 @@ export interface ReverseGeocodeResult {
 }
 
 /**
+ * Reverse-geocode cache, keyed to 4 decimal places (~11 m — far finer than
+ * any address boundary). Re-detecting in the same spot is extremely common
+ * (every page mount, every manual re-check), and Nominatim is a free public
+ * service with a usage policy, not something to hammer.
+ */
+const geocodeCache = new Map<string, ReverseGeocodeResult>();
+const GEOCODE_CACHE_MAX = 50;
+
+/** Test seam: clears the reverse-geocode cache between cases. */
+export function clearGeocodeCache(): void {
+  geocodeCache.clear();
+}
+
+function cacheGeocode(key: string, value: ReverseGeocodeResult) {
+  if (geocodeCache.size >= GEOCODE_CACHE_MAX) {
+    const oldest = geocodeCache.keys().next().value;
+    if (oldest !== undefined) geocodeCache.delete(oldest);
+  }
+  geocodeCache.set(key, value);
+}
+
+/**
  * Reverse geocode coordinates via Nominatim (OSM), returning a detailed
  * structured address: landmark, street, area, village, town/city, district,
  * state and PIN code whenever OSM has them tagged.
+ *
+ * Bounded by a timeout on purpose: without one, a hanging Nominatim request
+ * left the caller awaiting forever, so the coordinates were never applied and
+ * the app sat on its previous location looking like a GPS failure.
  */
 export async function reverseGeocode(
   lat: number,
   lng: number,
 ): Promise<ReverseGeocodeResult> {
+  const cacheKey = `${lat.toFixed(4)},${lng.toFixed(4)}`;
+  const cached = geocodeCache.get(cacheKey);
+  if (cached) return cached;
+
   const fallback = { address: `${lat.toFixed(5)}, ${lng.toFixed(5)}` };
   try {
     const res = await fetch(
       `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1&namedetails=1`,
-      { headers: { "User-Agent": "SahakarSeva/1.0 (cooperative-gis)" } },
+      {
+        headers: { "User-Agent": "SahakarSeva/1.0 (cooperative-gis)" },
+        signal: AbortSignal.timeout(6000),
+      },
     );
     if (!res.ok) return fallback;
     const data = await res.json();
@@ -167,10 +313,12 @@ export async function reverseGeocode(
       return true;
     });
 
-    return {
+    const result: ReverseGeocodeResult = {
       address: parts.length > 0 ? parts.join(", ") : fallback.address,
       landmark, road, area, village, city, district, state, pincode,
     };
+    cacheGeocode(cacheKey, result);
+    return result;
   } catch {
     return fallback;
   }
