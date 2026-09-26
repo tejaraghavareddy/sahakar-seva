@@ -27,15 +27,14 @@ async function isAdminUser(
   return user.role === "admin";
 }
 
-/* ── Security: audit ledger + passcode brute-force lockout ── */
+/* ── Audit ledger ───────────────────────────────────────────── */
 
-const MAX_FAILS = 5;
-const LOCKOUT_MS = 10 * 60 * 1000; // 10 minutes
-
-type Ctx = MutationCtx;
-
+/**
+ * Write one row to the privileged-action audit ledger. Every board decision
+ * (KYC review, admin cancel, dispute resolution) records who did it.
+ */
 async function audit(
-  ctx: Ctx,
+  ctx: MutationCtx,
   entry: {
     actorId?: Id<"users"> | null;
     email?: string;
@@ -55,136 +54,6 @@ async function audit(
     at: Date.now(),
   });
 }
-
-async function getLockout(ctx: Ctx) {
-  return await ctx.db
-    .query("adminLockout")
-    .withIndex("by_key", (q) => q.eq("key", "global"))
-    .first();
-}
-
-async function recordFail(ctx: MutationCtx) {
-  const now = Date.now();
-  const lock = await getLockout(ctx);
-  const fails = (lock?.fails ?? 0) + 1;
-  const lockedUntil =
-    fails >= MAX_FAILS ? now + LOCKOUT_MS : lock?.lockedUntil;
-  if (lock) {
-    await ctx.db.patch(lock._id, { fails, lockedUntil, updatedAt: now });
-  } else {
-    await ctx.db.insert("adminLockout", {
-      key: "global",
-      fails,
-      lockedUntil,
-      updatedAt: now,
-    });
-  }
-  return { fails, lockedUntil };
-}
-
-/**
- * Emergency clearance: master admin email OR the offline federation
- * passcode for local testing (fixed emergency code). Grants admin role.
- *
- * Security hardening:
- *  - every attempt (success or failure) is written to the adminAuditLog
- *  - 5 wrong passcodes lock attempts for 10 minutes (brute-force protection)
- *  - a correct passcode converts a guest session into the shared demo admin
- *    account (demo.admin@sahakar.demo) so the passcode alone can grant clearance
- *
- * IMPORTANT: a denial is returned as *data* ({ ok: false, message }), never
- * thrown. Convex rolls the entire transaction back when a mutation throws, so
- * throwing here would silently discard the failure counter and the audit row —
- * i.e. the lockout would never engage and the ledger would stay empty.
- */
-export type EmergencyUnlockResult =
-  | { ok: true }
-  | { ok: false; message: string };
-
-export const emergencyUnlock = mutation({
-  args: { passcode: v.string() },
-  handler: async (ctx, args): Promise<EmergencyUnlockResult> => {
-    const userId = await requireUser(ctx);
-    const user = await ctx.db.get(userId);
-    if (!user) throw new Error("Not authenticated");
-
-    // Brute-force lockout check
-    const lock = await getLockout(ctx);
-    const now = Date.now();
-    if (lock?.lockedUntil && lock.lockedUntil > now) {
-      await audit(ctx, {
-        actorId: userId,
-        email: user.email,
-        kind: "clearance_denied",
-        method: "passcode",
-        ok: false,
-        detail: "Attempt while locked out",
-      });
-      const mins = Math.ceil((lock.lockedUntil - now) / 60_000);
-      return {
-        ok: false,
-        message: `Too many failed attempts — locked for ${mins} more minute${mins === 1 ? "" : "s"}`,
-      };
-    }
-
-    const EMERGENCY = "SAHAKAR-BOARD-2026";
-    if (args.passcode.trim() !== EMERGENCY) {
-      const { fails, lockedUntil } = await recordFail(ctx);
-      await audit(ctx, {
-        actorId: userId,
-        email: user.email,
-        kind: "clearance_denied",
-        method: "passcode",
-        ok: false,
-        detail: lockedUntil ? "Wrong passcode — now locked out" : `Wrong passcode (${fails}/${MAX_FAILS})`,
-      });
-      return {
-        ok: false,
-        message: lockedUntil
-          ? "Too many failed attempts — locked for 10 minutes"
-          : `Invalid emergency passcode (${MAX_FAILS - fails} attempt${MAX_FAILS - fails === 1 ? "" : "s"} remaining)`,
-      };
-    }
-
-    // Success — reset lockout, grant role, audit.
-    if (lock) {
-      await ctx.db.patch(lock._id, { fails: 0, lockedUntil: undefined, updatedAt: now });
-    }
-
-    // First-time officer still on a guest session? Convert the guest into the
-    // shared demo admin account so the passcode alone grants clearance.
-    if (user.isAnonymous) {
-      await ctx.db.patch(userId, {
-        isAnonymous: false,
-        email: DEMO_ADMIN_EMAILS[0],
-        name: "Demo Federation Officer",
-        role: "admin",
-      });
-      await audit(ctx, {
-        actorId: userId,
-        email: DEMO_ADMIN_EMAILS[0],
-        kind: "clearance_granted",
-        method: "passcode",
-        ok: true,
-        detail: "Guest session converted to demo admin via emergency passcode",
-      });
-      return { ok: true };
-    }
-
-    if (user.role !== "admin") {
-      await ctx.db.patch(userId, { role: "admin" });
-    }
-    await audit(ctx, {
-      actorId: userId,
-      email: user.email,
-      kind: "clearance_granted",
-      method: "passcode",
-      ok: true,
-      detail: "Emergency passcode accepted — admin role granted",
-    });
-    return { ok: true };
-  },
-});
 
 /** Audit trail of security events — cleared officers only. */
 export const auditLog = query({

@@ -11,6 +11,7 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { query, mutation, QueryCtx, MutationCtx } from "./_generated/server";
 import { DEMO_ADMIN_EMAILS } from "./admin";
+import { consume } from "./rateLimit";
 import { Id } from "./_generated/dataModel";
 import { v } from "convex/values";
 import type { Doc } from "./_generated/dataModel";
@@ -111,6 +112,9 @@ export const create = mutation({
   },
   handler: async (ctx, args) => {
     const userId = await requireUser(ctx);
+    // Publishing puts work in front of the board's review queue, so the
+    // submission rate is bounded per worker as well as by the listing cap.
+    await consume(ctx, "listing", userId);
     const artisan = await myArtisan(ctx, userId);
 
     const name = clean(args.name);

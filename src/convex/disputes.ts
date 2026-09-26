@@ -1,6 +1,7 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { query, mutation, QueryCtx } from "./_generated/server";
 import { DEMO_ADMIN_EMAILS } from "./admin";
+import { consume } from "./rateLimit";
 import { Id } from "./_generated/dataModel";
 import { v } from "convex/values";
 
@@ -42,6 +43,9 @@ export const raise = mutation({
     if (!isCustomer && !isWorker) {
       throw new Error("Only the customer or assigned worker can flag this booking");
     }
+    // Charged only after the caller is confirmed to be a party to this
+    // booking, so the budget cannot be drained against arbitrary booking ids.
+    await consume(ctx, "dispute", userId);
     if (!args.details.trim()) throw new Error("Please describe the issue");
 
     return await ctx.db.insert("disputes", {

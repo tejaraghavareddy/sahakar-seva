@@ -11,21 +11,22 @@ interface AdminLoginModalProps {
 }
 
 /**
- * Secure Federation Officer clearance dialog.
- * Two paths to clearance:
- *  1. Sign in with the recognized master administrator email
- *     (teja200822@gmail.com) via email OTP.
- *  2. Emergency offline passcode for local testing
- *     (SAHAKAR-BOARD-2026) — grants the admin role to the current session.
+ * Federation Officer clearance dialog.
+ *
+ * Clearance is granted by proving ownership of a registered officer email
+ * (one-time 6-digit code sent to that inbox). There is deliberately no
+ * shared-secret fallback: any passcode baked into this file would ship in the
+ * public JS bundle and hand the governance console to anyone who opens
+ * devtools. The server re-checks the email against the officer list, so this
+ * dialog only drives the OTP step.
  */
 export default function AdminLoginModal({ open, onClose, onSuccess }: AdminLoginModalProps) {
-  const { isAuthenticated, isLoading, signIn } = useAuth();
-  const emergencyUnlock = useMutation(api.admin.emergencyUnlock);
+  const { isLoading, signIn } = useAuth();
+  const requestOtp = useMutation(api.authThrottle.requestOtp);
 
   const [email, setEmail] = useState("");
   const [otp, setOtp] = useState("");
   const [otpSent, setOtpSent] = useState(false);
-  const [passcode, setPasscode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -36,6 +37,9 @@ export default function AdminLoginModal({ open, onClose, onSuccess }: AdminLogin
     setBusy(true);
     setError(null);
     try {
+      // Spend part of the per-address send budget first, so repeated requests
+      // cannot be used to mail codes to an arbitrary inbox.
+      await requestOtp({ email });
       const fd = new FormData();
       fd.set("email", email);
       await signIn("email-otp", fd);
@@ -56,7 +60,7 @@ export default function AdminLoginModal({ open, onClose, onSuccess }: AdminLogin
       fd.set("email", email);
       fd.set("code", otp);
       await signIn("email-otp", fd);
-      // Session cleared; the master email check happens server-side.
+      // Session cleared; the officer-email check happens server-side.
       onSuccess();
     } catch {
       setError("The code is incorrect or expired. Please try again.");
@@ -64,33 +68,12 @@ export default function AdminLoginModal({ open, onClose, onSuccess }: AdminLogin
     }
   }
 
-  async function handleEmergency(e: React.FormEvent) {
-    e.preventDefault();
-    setBusy(true);
-    setError(null);
-    try {
-      // Ensure there is a session to grant clearance to (auto guest sign-in).
-      if (!isAuthenticated) {
-        await signIn("anonymous");
-      }
-      await emergencyUnlock({ passcode });
-      onSuccess();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Invalid emergency passcode");
-      setBusy(false);
-    }
-  }
-
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs"
-      onClick={(e) => e.target === e.currentTarget && onClose()}
-    >
-      <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white shadow-2xl">
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-3.5">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm">
+      <div className="w-full max-w-md overflow-hidden rounded-3xl bg-white shadow-2xl">
+        <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
           <div className="flex items-center gap-2">
-            <span className="flex size-8 items-center justify-center rounded-xl bg-slate-900 text-white">
+            <span className="flex size-9 items-center justify-center rounded-xl bg-emerald-800 text-white">
               <ShieldCheck className="size-4" />
             </span>
             <div>
@@ -98,140 +81,96 @@ export default function AdminLoginModal({ open, onClose, onSuccess }: AdminLogin
                 Federation Officer Clearance
               </h2>
               <p className="text-[11px] text-slate-500">
-                Governance &amp; Supervisory Board access only
+                Restricted governance area
               </p>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="flex size-8 items-center justify-center rounded-xl border border-slate-200 text-slate-400 transition hover:bg-slate-50 hover:text-slate-600"
+            className="flex size-8 items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+            aria-label="Close"
           >
             <X className="size-4" />
           </button>
         </div>
 
-        <div className="space-y-5 px-5 py-5">
-          {isLoading ? (
-            <div className="flex items-center justify-center py-6">
-              <Loader2 className="size-5 animate-spin text-slate-400" />
-            </div>
-          ) : !otpSent ? (
-            /* Email sign-in */
-            <form onSubmit={handleSendOtp} className="space-y-3">
-              <p className="text-xs leading-relaxed text-slate-600">
-                Sign in with the recognized master administrator email to receive
-                a one-time verification code.
-              </p>
-              <input
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="officer@sahakarseva.org"
-                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 transition placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-              />
-              {error && <p className="text-xs font-semibold text-rose-600">{error}</p>}
-              <button
-                type="submit"
-                disabled={busy}
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-emerald-700 active:scale-95 disabled:opacity-50"
-              >
-                {busy && <Loader2 className="size-4 animate-spin" />}
-                <LockKeyhole className="size-4" />
-                Send verification code
-              </button>
-            </form>
-          ) : (
-            /* OTP verify */
-            <form onSubmit={handleVerifyOtp} className="space-y-3">
-              <p className="text-xs leading-relaxed text-slate-600">
-                Enter the 6-digit code sent to{" "}
-                <span className="font-bold text-slate-900">{email}</span>.
-              </p>
-              <input
-                inputMode="numeric"
-                maxLength={6}
-                required
-                value={otp}
-                onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
-                placeholder="······"
-                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-center text-lg font-black tracking-[0.5em] text-slate-900 transition focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-              />
-              {error && <p className="text-xs font-semibold text-rose-600">{error}</p>}
-              <button
-                type="submit"
-                disabled={busy || otp.length !== 6}
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-emerald-700 active:scale-95 disabled:opacity-50"
-              >
-                {busy && <Loader2 className="size-4 animate-spin" />}
-                Verify &amp; enter admin portal
-              </button>
-              <button
-                type="button"
-                onClick={() => { setOtpSent(false); setOtp(""); setError(null); }}
-                className="w-full text-center text-[11px] font-semibold text-slate-500 hover:text-emerald-700"
-              >
-                Use a different email
-              </button>
-            </form>
-          )}
-
-          {/* Divider */}
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t border-slate-200" />
-            </div>
-            <div className="relative flex justify-center">
-              <span className="bg-white px-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                or emergency passcode
-              </span>
-            </div>
-          </div>
-
-          {/* Emergency passcode (offline / local testing) */}
-          <form onSubmit={handleEmergency} className="space-y-3">
-            <p className="text-xs leading-relaxed text-slate-600">
-              For offline and local testing, board officers can unlock the
-              console with the federation emergency passcode.
+        {!otpSent ? (
+          <form onSubmit={handleSendOtp} className="px-6 py-6">
+            <label className="block text-xs font-bold text-slate-700">
+              Officer email address
+            </label>
+            <p className="mt-1 text-[11px] leading-relaxed text-slate-500">
+              Enter the email registered with the cooperative board. We will
+              send a 6-digit verification code to that inbox.
             </p>
             <input
-              type="password"
-              value={passcode}
-              onChange={(e) => setPasscode(e.target.value)}
-              placeholder="Emergency passcode"
-              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 transition placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="officer@sahakar.demo"
+              className="mt-3 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 transition placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
             />
-            {error && <p className="text-xs font-semibold text-rose-600">{error}</p>}
+            {error && (
+              <p className="mt-3 text-xs font-semibold text-rose-600">{error}</p>
+            )}
             <button
               type="submit"
-              disabled={busy || !passcode.trim()}
-              className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-300 bg-slate-900 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-slate-800 active:scale-95 disabled:opacity-50"
+              disabled={busy || isLoading || !email.trim()}
+              className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-emerald-800 active:scale-95 disabled:opacity-60"
             >
-              {busy && <Loader2 className="size-4 animate-spin" />}
-              <LockKeyhole className="size-4" />
-              Unlock with passcode
+              {busy ? <Loader2 className="size-4 animate-spin" /> : <LockKeyhole className="size-4" />}
+              Send verification code
             </button>
-            {!isAuthenticated && (
-              <p className="text-center text-[11px] text-slate-500">
-                First time? Enter the passcode — your session is upgraded to
-                the demo officer account automatically, no email needed.
-              </p>
-            )}
           </form>
-        </div>
+        ) : (
+          <form onSubmit={handleVerifyOtp} className="px-6 py-6">
+            <label className="block text-xs font-bold text-slate-700">
+              Enter the 6-digit code
+            </label>
+            <p className="mt-1 text-[11px] leading-relaxed text-slate-500">
+              Sent to <span className="font-semibold text-slate-700">{email}</span>.
+              Codes expire in 15 minutes.
+            </p>
+            <input
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              maxLength={6}
+              value={otp}
+              onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
+              placeholder="000000"
+              className="mt-3 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-center font-mono text-xl tracking-[0.5em] text-slate-900 transition placeholder:text-slate-300 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+            />
+            {error && (
+              <p className="mt-3 text-xs font-semibold text-rose-600">{error}</p>
+            )}
+            <button
+              type="submit"
+              disabled={busy || otp.length !== 6}
+              className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-emerald-800 active:scale-95 disabled:opacity-60"
+            >
+              {busy ? <Loader2 className="size-4 animate-spin" /> : <ShieldCheck className="size-4" />}
+              Verify &amp; enter console
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setOtpSent(false);
+                setOtp("");
+                setError(null);
+              }}
+              className="mt-3 w-full text-center text-[11px] font-semibold text-slate-500 transition hover:text-emerald-700"
+            >
+              Use a different email
+            </button>
+          </form>
+        )}
 
         <div className="rounded-b-3xl border-t border-slate-200 bg-slate-50 px-5 py-3">
-          <div className="mb-2 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2">
-            <p className="text-center text-[11px] font-bold text-amber-800">
-              ⚠️ Demo access — emergency passcode:
-              <span className="mx-1 rounded bg-amber-100 px-1.5 py-0.5 font-mono">SAHAKAR-BOARD-2026</span>
-              works even while signed out. Demo only; remove before production.
-            </p>
-          </div>
-          <p className="text-center text-[10px] text-slate-400">
-            All clearance attempts are logged in the federation audit ledger ·
-            5 wrong passcodes lock access for 10 minutes.
+          <p className="text-center text-[10px] leading-relaxed text-slate-400">
+            Clearance attempts are written to the federation audit ledger.
+            Officer status is verified on the server, never in the browser.
           </p>
         </div>
       </div>

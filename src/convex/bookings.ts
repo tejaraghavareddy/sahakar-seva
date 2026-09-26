@@ -1,6 +1,7 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { query, mutation, QueryCtx, MutationCtx } from "./_generated/server";
 import { DEMO_ADMIN_EMAILS } from "./admin";
+import { consume } from "./rateLimit";
 import { parseCustomServiceId } from "./customServices";
 import { Doc, Id } from "./_generated/dataModel";
 import { v } from "convex/values";
@@ -152,6 +153,9 @@ export const create = mutation({
   },
   handler: async (ctx, args) => {
     const userId = await requireUser(ctx);
+    // Every booking becomes a live dispatch on the workers' radar, so creation
+    // is rate limited per customer before any work is done.
+    await consume(ctx, "booking", userId);
     const svc = await priceService(ctx, args.serviceId);
     if (!svc) throw new Error("Unknown service");
     if (!args.address.trim()) throw new Error("Address is required");
@@ -279,6 +283,9 @@ export const sendMessage = mutation({
     }
     const body = args.body.trim();
     if (!body) throw new Error("Empty message");
+    // Charged only after the sender is known to belong to the conversation, so
+    // the budget cannot be drained by poking ids they do not own.
+    await consume(ctx, "message", userId);
     const user = await ctx.db.get(userId);
     const me = await getMyArtisan(ctx, userId);
     const role =
@@ -307,6 +314,13 @@ export const accept = mutation({
     const b = await ctx.db.get(args.id);
     if (!b) throw new Error("Booking not found");
     if (b.status !== "pending") throw new Error("No longer available");
+    // The job radar only ever *shows* a worker their own trade, but that is a
+    // UI convenience, not a control: the mutation is publicly callable with any
+    // booking id, so the trade match has to be enforced here too or a plumber
+    // could claim an electrical job simply by knowing its id.
+    if (b.trade !== me.trade) {
+      throw new Error("This job is not in your trade.");
+    }
     await ctx.db.patch(b._id, {
       status: "accepted",
       workerId: me._id,

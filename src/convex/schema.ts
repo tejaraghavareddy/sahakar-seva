@@ -192,11 +192,18 @@ const schema = defineSchema(
       .index("by_at", ["at"])
       .index("by_kind", ["kind"]),
 
-    // Brute-force lockout state for emergency passcode attempts (single row: key "global")
-    adminLockout: defineTable({
-      key: v.string(),
-      fails: v.number(),
-      lockedUntil: v.optional(v.number()),
+    // Rate limiting / lockout state. One row per (scope, subject) pair — the
+    // key is namespaced by the operation being limited, e.g.
+    // "otp:<hashed email>", "booking:<userId>", "msg:<userId>".
+    //
+    // This is deliberately per-subject rather than a single global counter: a
+    // shared row means one attacker exhausting a limit locks every legitimate
+    // user out at the same time, turning spam protection into a denial of
+    // service against your own members.
+    rateLimits: defineTable({
+      key: v.string(), // "<scope>:<subject>", unique per rate-limited operation
+      count: v.number(),
+      windowStart: v.number(),
       updatedAt: v.number(),
     }).index("by_key", ["key"]),
 

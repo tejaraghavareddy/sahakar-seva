@@ -86,8 +86,11 @@ describe("bookings:create", () => {
 
   it("splits every catalogue price exactly — no rupee is created or lost", async () => {
     const t = setupTest();
-    const { as } = await seedCustomer(t);
     for (const serviceId of SERVICE_IDS) {
+      // A fresh customer per service: this test is about arithmetic, and one
+      // account booking the whole catalogue would run into the per-customer
+      // booking throttle that guards real dispatches.
+      const { as } = await seedCustomer(t);
       const id = await as.mutation(api.bookings.create, { ...createArgs, serviceId });
       const b = must(await t.run((ctx) => ctx.db.get(id)), `booking for ${serviceId}`);
       expect(b.workerShare, `${serviceId} worker share`).toBe(Math.round(b.base * 0.9));
@@ -358,6 +361,27 @@ describe("bookings:accept", () => {
     await expect(w.as.mutation(api.bookings.accept, { id: b })).rejects.toThrow(
       "No longer available",
     );
+  });
+
+  it("refuses a job outside the worker's own trade", async () => {
+    // The radar only *shows* a worker their trade, but the mutation is
+    // callable with any booking id, so the trade must be enforced server-side.
+    const t = setupTest();
+    const w = await seedWorker(t);
+    await seedArtisan(t, w.id, {
+      trade: "plumber",
+      quizPassed: true,
+      kycStatus: "verified",
+    });
+    const c = await seedCustomer(t);
+    const b = await seedBooking(t, c.id, { trade: "electrician", status: "pending" });
+
+    await expect(w.as.mutation(api.bookings.accept, { id: b })).rejects.toThrow(
+      "not in your trade",
+    );
+    const row = must(await t.run((ctx) => ctx.db.get(b)), "booking");
+    expect(row.status).toBe("pending");
+    expect(row.workerUserId).toBeUndefined();
   });
 });
 

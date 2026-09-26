@@ -51,12 +51,36 @@ describe("artisans:listArtisans", () => {
     await seedArtisan(t, b.id, { fullName: "Gone", removedAt: Date.now() });
 
     const list = await t.query(api.artisans.listArtisans);
-    expect(list.map((x) => x.fullName)).toEqual(["Active"]);
+    expect(list).toHaveLength(1);
   });
 
   it("is readable with no session at all", async () => {
     const t = setupTest();
     expect(await t.query(api.artisans.listArtisans)).toEqual([]);
+  });
+
+  it("never leaks worker PII to an unauthenticated caller", async () => {
+    const t = setupTest();
+    const w = await seedWorker(t);
+    await seedArtisan(t, w.id, {
+      fullName: "Asha",
+      phone: "9876543210",
+      upiVpa: "asha@upi",
+      idType: "aadhaar",
+      idLast4: "4321",
+      welfareBalance: 700,
+      lat: 15.83,
+      lng: 78.03,
+    });
+
+    const list = await t.query(api.artisans.listArtisans);
+    // Only what the availability maths reads may cross the public boundary.
+    expect(Object.keys(list[0]).sort()).toEqual(["kycStatus", "lat", "lng", "trade"]);
+
+    const serialized = JSON.stringify(list);
+    for (const secret of ["9876543210", "asha@upi", "4321", "Asha", "700"]) {
+      expect(serialized).not.toContain(secret);
+    }
   });
 });
 

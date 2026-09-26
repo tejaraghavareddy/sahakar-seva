@@ -6,6 +6,8 @@ import {
 } from "@/components/ui/input-otp";
 import { LanguagePicker } from "@/components/terminal";
 import { useAuth } from "@/hooks/use-auth";
+import { useMutation } from "convex/react";
+import { api } from "@/convex/_generated/api";
 import { useLang } from "@/lib/i18n";
 import {
   ArrowRight,
@@ -36,6 +38,7 @@ function resolveReturnTo(returnTo: string | null, fallback = "/services") {
 function CustomerAuth() {
   const { isLoading: authLoading, isAuthenticated, signIn } = useAuth();
   const { t } = useLang();
+  const requestOtp = useMutation(api.authThrottle.requestOtp);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const redirect = resolveReturnTo(searchParams.get("returnTo"));
@@ -56,6 +59,9 @@ function CustomerAuth() {
     setError(null);
     try {
       const formData = new FormData(event.currentTarget);
+      // Spend part of the per-address send budget first, so repeated requests
+      // cannot be used to mail codes to an arbitrary inbox.
+      await requestOtp({ email: String(formData.get("email") ?? "") });
       await signIn("email-otp", formData);
       setStep({ email: formData.get("email") as string });
     } catch (err) {

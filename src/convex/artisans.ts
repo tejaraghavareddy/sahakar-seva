@@ -41,12 +41,30 @@ export const getMyArtisan = query({
   },
 });
 
-/** Public federation directory (used by the landing page ticker). */
+/**
+ * Public federation directory used by the catalog to show real, live
+ * availability ("3 verified electricians nearby · 1.2 km away").
+ *
+ * This query is reachable with no session at all, so it must never return
+ * whole artisan documents: those carry `phone`, `idType`, `idLast4` (identity
+ * document digits), `upiVpa` (the worker's payout address), cooperative
+ * balances and live GPS. Only the four fields the availability maths actually
+ * reads are projected out — anything a new caller needs must be added here
+ * deliberately rather than inherited by accident.
+ */
 export const listArtisans = query({
   args: {},
   handler: async (ctx) => {
     const all = await ctx.db.query("artisans").order("desc").take(200);
-    return all.filter((a) => !a.removedAt).slice(0, 50);
+    return all
+      .filter((a) => !a.removedAt)
+      .slice(0, 50)
+      .map((a) => ({
+        trade: a.trade,
+        kycStatus: a.kycStatus,
+        lat: a.lat,
+        lng: a.lng,
+      }));
   },
 });
 

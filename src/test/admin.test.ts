@@ -12,8 +12,6 @@ import {
   setupTest,
 } from "./convexHarness";
 
-const PASSCODE = "SAHAKAR-BOARD-2026";
-
 describe("admin:amAdmin", () => {
   it("is false when signed out", async () => {
     const t = setupTest();
@@ -62,119 +60,44 @@ describe("admin-gated queries", () => {
   });
 });
 
-describe("admin:emergencyUnlock", () => {
-  it("refuses a signed-out caller", async () => {
-    const t = setupTest();
-    await expect(t.mutation(api.admin.emergencyUnlock, { passcode: PASSCODE })).rejects.toThrow(
-      "Not authenticated",
-    );
+describe("admin: emergency passcode backdoor (removed)", () => {
+  it("no longer exposes an emergencyUnlock mutation", () => {
+    // The shared-secret unlock was deleted. A passcode hardcoded in the
+    // Convex source also ships inside the public JS bundle, so anyone could
+    // read it from devtools and grant themselves the governance console.
+    // Clearance is email-OTP only, and the officer check stays server-side.
+    expect("emergencyUnlock" in api.admin).toBe(false);
   });
 
-  it("grants admin to a signed-in member with the correct passcode and audits it", async () => {
+  it("leaves an ordinary member without admin rights", async () => {
     const t = setupTest();
     const u = await seedCustomer(t, { email: "officer@x.com" });
-    expect(await u.as.mutation(api.admin.emergencyUnlock, { passcode: PASSCODE })).toEqual({
-      ok: true,
-    });
-    expect(must(await t.run((ctx) => ctx.db.get(u.id)), "user").role).toBe("admin");
-    expect(await u.as.query(api.admin.amAdmin)).toBe(true);
-
-    const log = await u.as.query(api.admin.auditLog);
-    const granted = log.filter((r) => r.kind === "clearance_granted");
-    expect(granted).toHaveLength(1);
-    expect(granted[0].ok).toBe(true);
-    expect(granted[0].actor).toBe("officer@x.com");
-  });
-
-  it("converts a guest session into the shared demo officer account", async () => {
-    const t = setupTest();
-    const guest = await seedUser(t, { name: "Guest", isAnonymous: true });
-    const as = t.withIdentity({ subject: guest });
-    expect(await as.query(api.admin.amAdmin)).toBe(false);
-
-    await as.mutation(api.admin.emergencyUnlock, { passcode: PASSCODE });
-    const row = must(await t.run((ctx) => ctx.db.get(guest)), "user");
-    expect(row.isAnonymous).toBe(false);
-    expect(row.email).toBe("demo.admin@sahakar.demo");
-    expect(row.role).toBe("admin");
-    expect(await as.query(api.admin.amAdmin)).toBe(true);
-  });
-
-  it("counts down the remaining attempts on a wrong passcode", async () => {
-    const t = setupTest();
-    const u = await seedCustomer(t, { email: "u@x.com" });
-    expect(await u.as.mutation(api.admin.emergencyUnlock, { passcode: "nope" })).toEqual({
-      ok: false,
-      message: expect.stringContaining("4 attempts remaining"),
-    });
-    expect(await u.as.mutation(api.admin.emergencyUnlock, { passcode: "nope" })).toEqual({
-      ok: false,
-      message: expect.stringContaining("3 attempts remaining"),
-    });
+    expect(await u.as.query(api.admin.amAdmin)).toBe(false);
     expect(must(await t.run((ctx) => ctx.db.get(u.id)), "user").role).not.toBe("admin");
-  });
-
-  it("persists every denied attempt in the audit ledger", async () => {
-    const t = setupTest();
-    const u = await seedCustomer(t, { email: "u@x.com" });
-    await u.as.mutation(api.admin.emergencyUnlock, { passcode: "nope" });
-    await u.as.mutation(api.admin.emergencyUnlock, { passcode: "nope" });
-
-    // Only a cleared officer can read the ledger back.
-    const officer = await seedAdmin(t);
-    const log = await officer.as.query(api.admin.auditLog);
-    expect(log.filter((r) => r.kind === "clearance_denied")).toHaveLength(2);
-  });
-
-  it("locks out for 10 minutes after 5 wrong passcodes", async () => {
-    const t = setupTest();
-    const u = await seedCustomer(t, { email: "u@x.com" });
-    for (let i = 0; i < 4; i++) {
-      expect((await u.as.mutation(api.admin.emergencyUnlock, { passcode: "nope" })).ok).toBe(
-        false,
-      );
-    }
-    const fifth = await u.as.mutation(api.admin.emergencyUnlock, { passcode: "nope" });
-    expect(fifth.ok).toBe(false);
-    if (!fifth.ok) expect(fifth.message).toContain("locked for 10 minutes");
-
-    // Even the correct passcode is refused while the lockout is active.
-    const locked = await u.as.mutation(api.admin.emergencyUnlock, { passcode: PASSCODE });
-    expect(locked.ok).toBe(false);
-    if (!locked.ok) expect(locked.message).toContain("locked for");
-    expect(must(await t.run((ctx) => ctx.db.get(u.id)), "user").role).not.toBe("admin");
-
-    const officer = await seedAdmin(t);
-    const log = await officer.as.query(api.admin.auditLog);
-    expect(log.filter((r) => r.kind === "clearance_denied").length).toBeGreaterThanOrEqual(5);
-  });
-
-  it("resets the failure counter after a successful unlock", async () => {
-    const t = setupTest();
-    const u = await seedCustomer(t, { email: "u@x.com" });
-    await u.as.mutation(api.admin.emergencyUnlock, { passcode: "nope" });
-    await u.as.mutation(api.admin.emergencyUnlock, { passcode: PASSCODE });
-    const lock = must(await t.run((ctx) => ctx.db.query("adminLockout").first()), "lockout row");
-    expect(lock.fails).toBe(0);
-    expect(lock.lockedUntil).toBeUndefined();
   });
 });
 
 describe("admin:auditLog", () => {
   it("resolves the actor name and marks unattributed rows as anonymous", async () => {
     const t = setupTest();
-    const u = await seedCustomer(t, { email: "u@x.com" });
+    const officer = await seedAdmin(t);
     await t.run((ctx) =>
       ctx.db.insert("adminAuditLog", { kind: "legacy", ok: true, at: Date.now() }),
     );
-    await u.as.mutation(api.admin.emergencyUnlock, { passcode: "nope" });
+    await t.run((ctx) =>
+      ctx.db.insert("adminAuditLog", {
+        actorId: officer.id,
+        kind: "kyc_review",
+        ok: true,
+        at: Date.now(),
+      }),
+    );
 
-    const officer = await seedAdmin(t);
     const log = await officer.as.query(api.admin.auditLog);
     const legacy = log.filter((r) => r.kind === "legacy");
-    const denied = log.filter((r) => r.kind === "clearance_denied");
+    const review = log.filter((r) => r.kind === "kyc_review");
     expect(legacy[0].actor).toBe("anonymous");
-    expect(denied[0].actor).toBe("u@x.com");
+    expect(review[0].actor).toBe("board@sahakar.demo");
   });
 });
 
