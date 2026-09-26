@@ -1,4 +1,7 @@
 import { Phone } from "@convex-dev/auth/providers/Phone";
+// Relative, not the "@/" alias: Convex's own bundler does not resolve the
+// Vite alias, so a specifier that works in the browser fails to deploy here.
+import { PHONE_PROVIDER_ID } from "../../lib/authProviders";
 import axios from "axios";
 
 /**
@@ -30,6 +33,9 @@ import axios from "axios";
  */
 
 const MESSAGES_URL = "https://messages.nexmo.com/v1/messages";
+
+/** How long a code stays usable, in minutes. Also stated in the SMS text. */
+export const CODE_TTL_MIN = 10;
 
 /**
  * Normalise a user-typed Indian mobile number to E.164 (+91XXXXXXXXXX).
@@ -64,10 +70,7 @@ function maskPhone(e164: string): string {
   return `••••• ${e164.slice(-5)}`;
 }
 
-export const phoneOtp = Phone({
-  id: "phone-otp",
-  // A code that takes 20 minutes to type is not a code, it is a lost session.
-  maxAge: 60 * 10,
+const base = Phone({
   async sendVerificationRequest({ identifier, token }) {
     const apiKey = process.env.VONAGE_API_KEY;
     const apiSecret = process.env.VONAGE_API_SECRET;
@@ -85,7 +88,10 @@ export const phoneOtp = Phone({
         MESSAGES_URL,
         {
           messageType: "text",
-          text: `${token} is your Sahakar Seva worker sign-in code. It expires in 10 minutes. Do not share it with anyone.`,
+          // The lifetime is quoted from the same constant the provider is
+          // configured with, so the message can never promise a window the
+          // server will not honour.
+          text: `${token} is your Sahakar Seva worker sign-in code. It expires in ${CODE_TTL_MIN} minutes. Do not share it with anyone.`,
           to,
           from,
         },
@@ -103,3 +109,22 @@ export const phoneOtp = Phone({
     }
   },
 });
+
+/**
+ * `Phone()` builds its config object from hardcoded literals and ignores the
+ * `id` and `maxAge` passed to it:
+ *
+ *   { id: "phone", type: "phone", maxAge: 60 * 20, ... }
+ *
+ * So a provider created as `Phone({ id: "phone-otp", maxAge: 600 })` is
+ * registered under the id `"phone"` with a 20-minute life, with no error. The
+ * screen would then call `signIn("phone-otp", ...)` and Convex Auth would throw
+ * "Provider `phone-otp` is not configured" — the worker could not sign in at
+ * all. Both values are therefore applied here, after the factory runs, so this
+ * file owns its own contract.
+ */
+export const phoneOtp: typeof base = {
+  ...base,
+  id: PHONE_PROVIDER_ID,
+  maxAge: 60 * CODE_TTL_MIN,
+};

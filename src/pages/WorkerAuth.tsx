@@ -9,6 +9,11 @@ import { useAuth } from "@/hooks/use-auth";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useLang } from "@/lib/i18n";
+// The provider ids are owned by a client-safe constants module, so the screens
+// and the server providers cannot drift apart. Hard-coding "phone-otp" here
+// once shipped a screen that signed in with a provider Convex Auth had not
+// actually registered.
+import { EMAIL_PROVIDER_ID, PHONE_PROVIDER_ID } from "@/lib/authProviders";
 import {
   ArrowRight,
   BadgeCheck,
@@ -98,7 +103,15 @@ function WorkerAuth() {
     setIsLoading(true);
     try {
       await requestPhoneOtp({ phone });
-      await signIn("phone-otp", formDataWith(formData, { phone, code: "" }));
+      // Convex Auth decides between "send a code" and "verify a code" by
+      // whether `code` is *present*, not whether it is non-empty: see
+      // handleEmailAndPhoneProvider, which branches on
+      // `args.params?.code !== undefined`. Sending an empty `code` here would
+      // take the verify path with a blank code and never send an SMS at all.
+      // So the send step carries the phone number and nothing else.
+      const sendForm = new FormData();
+      sendForm.set("phone", phone);
+      await signIn(PHONE_PROVIDER_ID, sendForm);
       setStep({ kind: "phone", to: phone });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not send the code.");
@@ -134,7 +147,7 @@ function WorkerAuth() {
     setIsLoading(true);
     setError(null);
     try {
-      const provider = step.kind === "phone" ? "phone-otp" : "email-otp";
+      const provider = step.kind === "phone" ? PHONE_PROVIDER_ID : EMAIL_PROVIDER_ID;
       const formData = new FormData();
       if (step.kind === "phone") formData.set("phone", step.to);
       else formData.set("email", step.to);
@@ -461,17 +474,6 @@ function WorkerAuth() {
       </div>
     </div>
   );
-}
-
-/** Copy a FormData, overriding the entries we normalised. */
-function formDataWith(
-  base: FormData,
-  patch: Record<string, string>,
-): FormData {
-  const out = new FormData();
-  base.forEach((value, key) => out.set(key, String(value)));
-  for (const [key, value] of Object.entries(patch)) out.set(key, value);
-  return out;
 }
 
 export default function WorkerAuthPage() {

@@ -8,9 +8,53 @@
  * the customer portal.
  */
 import { describe, expect, it } from "vitest";
-import { normalisePhone } from "@/convex/auth/phoneOtp";
+import { normalisePhone, phoneOtp, CODE_TTL_MIN } from "@/convex/auth/phoneOtp";
+import { PHONE_PROVIDER_ID } from "@/lib/authProviders";
 import { signInPathFor, isWorkerPath } from "@/lib/portal";
-import { setupTest, api } from "./convexHarness";
+import { setupTest, api, must, seedUser } from "./convexHarness";
+
+describe("phone provider wiring", () => {
+  it("is a phone-typed provider under the id the screen signs in with", () => {
+    // Regression: Convex Auth's `Phone()` factory builds its config from
+    // hardcoded literals and ignores the `id` handed to it, so the provider
+    // was registered as "phone" while the screen called
+    // signIn("phone-otp", ...). That fails at runtime with "Provider
+    // `phone-otp` is not configured" — the screen simply never worked.
+    expect(phoneOtp.id).toBe(PHONE_PROVIDER_ID);
+    expect(phoneOtp.type).toBe("phone");
+  });
+
+  it("honours the code lifetime it promises in the SMS", () => {
+    // The same factory also hardcodes maxAge to 20 minutes. The SMS text
+    // quotes CODE_TTL_MIN, so the two must be the same number or we promise
+    // the worker a window the server will not honour.
+    expect(phoneOtp.maxAge).toBe(60 * CODE_TTL_MIN);
+  });
+
+  it("the users table really can store and look up a phone number", async () => {
+    // The project redefines the `users` table, and that override had silently
+    // dropped `phone` and the by_phone index. Convex Auth writes `phone` when
+    // it creates the account during phone sign-in, so prove the column is
+    // writable and the index resolves rather than trusting the schema file.
+    const t = setupTest();
+    const id = await seedUser(t, {
+      email: "gig@example.com",
+      phone: "+919876543210",
+      phoneVerificationTime: 1_700_000_000_000,
+    });
+    const found = must(
+      await t.run((ctx) =>
+        ctx.db
+          .query("users")
+          .withIndex("phone", (q) => q.eq("phone", "+919876543210"))
+          .first(),
+      ),
+      "user by phone index",
+    );
+    expect(found._id).toBe(id);
+    expect(found.phoneVerificationTime).toBe(1_700_000_000_000);
+  });
+});
 
 describe("normalisePhone", () => {
   it("accepts every way an Indian worker types their own number", () => {

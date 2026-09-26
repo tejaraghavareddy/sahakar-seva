@@ -2,7 +2,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { fireEvent, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { queryResults, mutationErrors, mutationCalls } from "./setup";
+import { queryResults, mutationErrors, mutationCalls, authSignInCalls } from "./setup";
 import { freshMocks, renderPage } from "./renderHarness";
 
 import Landing from "@/pages/Landing";
@@ -217,6 +217,57 @@ describe("auth pages", () => {
       (c) => c.path === "authThrottle:requestPhoneOtp",
     );
     expect(smsCalls).toHaveLength(0);
+  });
+
+  it("asks Convex Auth for a code WITHOUT a `code` field, so it actually sends one", async () => {
+    // Regression: Convex Auth branches on whether `code` is *present*
+    // (`args.params?.code !== undefined`), not whether it is non-empty. An
+    // empty `code` on the send step therefore took the verify path with a
+    // blank code: no SMS was ever sent and the worker could not sign in at
+    // all, while the UI looked like it had worked.
+    seedCommon();
+    renderPage(<WorkerAuth />, { route: "/login/worker" });
+    const phone = document.querySelector(
+      'input[name="phone"]',
+    ) as HTMLInputElement;
+    fireEvent.change(phone, { target: { value: "98765 43210" } });
+    fireEvent.click(screen.getByRole("button", { name: /text me a code/i }));
+    await screen.findByText(/we texted a code/i);
+
+    expect(authSignInCalls).toHaveLength(1);
+    const call = authSignInCalls[0];
+    expect(call.provider).toBe("phone-otp");
+    // The number is normalised to the same string the verify step will send.
+    expect(call.params.phone).toBe("+919876543210");
+    // Absent, not empty: this is the whole point of the test.
+    expect(call.params).not.toHaveProperty("code");
+  });
+
+  it("verifies with the phone number and the code, and nothing else", async () => {
+    seedCommon();
+    renderPage(<WorkerAuth />, { route: "/login/worker" });
+    const phone = document.querySelector(
+      'input[name="phone"]',
+    ) as HTMLInputElement;
+    fireEvent.change(phone, { target: { value: "9876543210" } });
+    fireEvent.click(screen.getByRole("button", { name: /text me a code/i }));
+    await screen.findByText(/we texted a code/i);
+
+    // input-otp renders one 6-character field with visual slot divs, not six
+    // separate inputs, so type the whole code into it.
+    const otp = document.querySelector<HTMLInputElement>(
+      'input[data-input-otp="true"]',
+    );
+    expect(otp).not.toBeNull();
+    await userEvent.type(otp as HTMLInputElement, "123456");
+    fireEvent.click(screen.getByRole("button", { name: /^verify code$/i }));
+
+    const verify = authSignInCalls[authSignInCalls.length - 1];
+    expect(verify.provider).toBe("phone-otp");
+    // The verify step must carry the same normalised number the code was sent
+    // to, plus the code itself.
+    expect(verify.params.phone).toBe("+919876543210");
+    expect(verify.params.code).toBe("123456");
   });
 });
 
