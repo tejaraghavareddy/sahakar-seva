@@ -16,6 +16,8 @@ import Onboarding from "@/pages/Onboarding";
 import Auth from "@/pages/Auth";
 import CustomerAuth from "@/pages/CustomerAuth";
 import Admin from "@/pages/Admin";
+import Welfare from "@/pages/Welfare";
+import WorkerProfile from "@/pages/WorkerProfile";
 
 /** A booking id string; page code only compares identity, never validates it. */
 const BOOKING_ID = "kg2abc123def456ghijk789lmn01op";
@@ -274,6 +276,62 @@ describe("authenticated portals", () => {
     renderPage(<Admin />, { route: "/admin" });
     expect(document.body.textContent?.length ?? 0).toBeGreaterThan(80);
   });
+
+  it("renders the welfare schemes page", () => {
+    seedCommon();
+    queryResults.set("welfareSchemes:myEligibility", {
+      profile: {
+        trade: "electrician",
+        tradeLabel: "Electrician",
+        experienceYears: 6,
+        completedJobs: 12,
+        annualIncome: 180000,
+        registered: true,
+      },
+      schemes: [
+        {
+          id: "pmaywas",
+          name: "PM Awas Yojana",
+          benefit: "₹1,20,000 assistance",
+          url: "https://example.gov.in",
+          criteria: ["Registered member of a cooperative"],
+          likelyEligible: true,
+          unmet: [],
+        },
+      ],
+      disclaimer: "This is the cooperative's own reading of published criteria.",
+    });
+    renderPage(<Welfare />, { route: "/welfare" });
+    expect(document.body.textContent?.length ?? 0).toBeGreaterThan(80);
+  });
+
+  it("renders a worker's public profile", () => {
+    seedCommon();
+    queryResults.set("artisans:profile", {
+      _id: "a1",
+      fullName: "Asha",
+      trade: "electrician",
+      district: "Kurnool",
+      state: "Andhra Pradesh",
+      experienceYears: 6,
+      slots: 0,
+      credentialId: "SSC-2026-AB12",
+      kycStatus: "verified",
+      kycVerifiedAt: Date.now(),
+      skillStatus: "verified",
+      skillVerifiedAt: Date.now(),
+      ratingAvg: 4.8,
+      ratingCount: 12,
+      completedJobs: 40,
+      isOnline: true,
+      listings: [],
+    });
+    renderPage(<WorkerProfile />, {
+      route: "/workers/a1",
+      path: "/workers/:id",
+    });
+    expect(document.body.textContent?.length ?? 0).toBeGreaterThan(80);
+  });
 });
 
 describe("no raw translation keys leak into the UI", () => {
@@ -286,6 +344,13 @@ describe("no raw translation keys leak into the UI", () => {
     ["Dashboard", () => <Dashboard />, "/dashboard"],
     ["Onboarding", () => <Onboarding />, "/onboarding"],
     ["Admin", () => <Admin />, "/admin"],
+    ["Welfare", () => <Welfare />, "/welfare"],
+    [
+      "WorkerProfile",
+      () => <WorkerProfile />,
+      "/workers/a1",
+      "/workers/:id",
+    ],
   ];
 
   for (const [name, make, route, path] of pages) {

@@ -417,9 +417,32 @@ describe("bookings:advance", () => {
     expect(await w.as.mutation(api.bookings.advance, { id: b })).toBe("enroute");
     expect(await w.as.mutation(api.bookings.advance, { id: b })).toBe("inprogress");
     expect(await w.as.mutation(api.bookings.advance, { id: b })).toBe("payment");
-    expect(await w.as.mutation(api.bookings.advance, { id: b })).toBe("completed");
+    // "payment" is not the worker's to advance — see the next test. The job
+    // reaches "completed" only through a verified settlement, so pay it here
+    // the way a customer would before the lifecycle can continue.
+    await c.as.mutation(api.bookings.confirmUtr, { id: b, utr: "UTR123456" });
     expect(await w.as.mutation(api.bookings.advance, { id: b })).toBe("settled");
     expect(must(await t.run((ctx) => ctx.db.get(b)), "booking").settledAt).toBeGreaterThan(0);
+  });
+
+  it("will not let a worker skip the payment step", async () => {
+    const t = setupTest();
+    const w = await seedWorker(t);
+    const artisan = await seedArtisan(t, w.id);
+    const c = await seedCustomer(t);
+    const b = await seedBooking(t, c.id, {
+      status: "payment",
+      workerId: artisan,
+      workerUserId: w.id,
+    });
+
+    // Without this guard the worker marks the job done for free, and the 7%
+    // welfare accrual never runs because it only fires on a real settlement.
+    await expect(w.as.mutation(api.bookings.advance, { id: b })).rejects.toThrow(
+      "Cannot advance from payment",
+    );
+    expect(must(await t.run((ctx) => ctx.db.get(b)), "booking").status).toBe("payment");
+    expect(must(await t.run((ctx) => ctx.db.get(artisan)), "artisan").welfareBalance).toBe(0);
   });
 
   it("refuses to advance a cancelled booking", async () => {

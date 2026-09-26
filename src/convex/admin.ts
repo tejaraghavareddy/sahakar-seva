@@ -84,8 +84,16 @@ export const earningsLedger = query({
       .collect();
 
     const per: Record<string, { name: string; trade: string; jobs: number; earnings: number; welfare: number }> = {};
+    // A shared visit is one job split across households, and every participant
+    // row carries the same visit-level amounts. Counting rows would report one
+    // visit as N jobs worth N times the earnings, so each group is counted once.
+    const countedGroups = new Set<string>();
     for (const b of bookings) {
       if (!b.workerId) continue;
+      if (b.groupId) {
+        if (countedGroups.has(b.groupId)) continue;
+        countedGroups.add(b.groupId);
+      }
       const a = artisans.find((x) => x._id === b.workerId);
       const entry = per[b.workerId] ?? {
         name: a?.fullName ?? "Unknown artisan",
@@ -122,9 +130,19 @@ export const overview = query({
     let welfarePool = 0;
     let workerPayouts = 0;
     let opsPool = 0;
+    // A shared visit is one job split across households. The pipeline counts
+    // every household (they are real rows a dispatcher can see), but the money
+    // totals must count the visit once — the split is applied to the visit
+    // price once, so summing the per-row amounts would triple the federation's
+    // reported revenue and welfare.
+    const moneyCounted = new Set<string>();
     for (const b of bookings) {
       byStatus[b.status] = (byStatus[b.status] ?? 0) + 1;
       if (b.status === "settled" || b.status === "completed") {
+        if (b.groupId) {
+          if (moneyCounted.has(b.groupId)) continue;
+          moneyCounted.add(b.groupId);
+        }
         revenueSettled += b.base;
         welfarePool += b.welfareAmt ?? 0;
         workerPayouts += b.workerShare ?? Math.round(b.base * 0.9);

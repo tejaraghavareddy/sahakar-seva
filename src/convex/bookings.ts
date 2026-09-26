@@ -99,11 +99,20 @@ export async function priceService(
 export const WORKER_SHARE_RATE = 0.9;
 export const WELFARE_RATE = 0.07;
 export const OPS_RATE = 0.03;
+/**
+ * The stage a worker may push a job to by hand.
+ *
+ * "payment" is deliberately absent. Leaving it is how a worker could mark a
+ * job completed without the customer ever paying, which would skip the payment
+ * step *and* the 7% welfare accrual in settlePaidBooking — the one thing this
+ * federation cannot afford to get wrong. The only way out of "payment" is a
+ * verified settlement: confirmUtr (customer submits the UTR) or
+ * markGatewayPaid (Razorpay signature).
+ */
 const NEXT_STATUS: Record<string, string> = {
   accepted: "enroute",
   enroute: "inprogress",
   inprogress: "payment",
-  payment: "completed",
   completed: "settled",
 };
 
@@ -438,11 +447,35 @@ export const advance = mutation({
   },
 });
 
+/**
+ * Credit the 7% welfare share for a settled booking.
+ *
+ * A shared visit is ONE job that several households pay a slice of, and the
+ * federation's 90/7/3 split is applied to the visit price once (see the
+ * bookingGroups comment in schema.ts). Every participant row therefore carries
+ * the same `welfareAmt`, because each row displays the split of the whole
+ * visit — so crediting per row would pay the welfare fund N times for N
+ * households. The first household to settle is the one that credits it; the
+ * rest are no-ops. Derived from the data rather than a flag, so it stays
+ * correct if participants join or leave.
+ */
 async function settlePaidBooking(ctx: MutationCtx, bookingId: Id<"bookings">) {
   const b = await ctx.db.get(bookingId);
   if (!b || !b.workerId) return;
   const w = await ctx.db.get(b.workerId);
   if (!w) return;
+
+  if (b.groupId) {
+    const siblings = await ctx.db
+      .query("bookings")
+      .withIndex("by_group", (q) => q.eq("groupId", b.groupId!))
+      .collect();
+    const alreadyCredited = siblings.some(
+      (r) => r._id !== b._id && r.paidAt !== undefined,
+    );
+    if (alreadyCredited) return;
+  }
+
   await ctx.db.patch(w._id, {
     welfareBalance: (w.welfareBalance ?? 0) + b.welfareAmt,
   });
