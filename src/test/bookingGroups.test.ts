@@ -229,7 +229,7 @@ describe("bookingGroups: shared cost-split bookings", () => {
 });
 
 describe("bookingGroups: dispatch into the workers' radar", () => {
-  it("puts a filled group's visit on the trade's job radar", async () => {
+  it("shows a filled group on the job radar as ONE visit, not N jobs", async () => {
     const t = setupTest();
     const a = await seedCustomer(t, { email: "a@example.com" });
     const b = await seedCustomer(t, { email: "b@example.com" });
@@ -238,9 +238,36 @@ describe("bookingGroups: dispatch into the workers' radar", () => {
     await b.as.mutation(api.bookingGroups.join, { id: groupId });
 
     const { radar } = await p.as.query(api.bookings.listForWorker);
-    // One visit, two pending household rows — the worker does one job.
-    expect(radar).toHaveLength(2);
-    expect(radar.every((r) => r.trade === "plumber")).toBe(true);
+    // Three households on one trip is one job. Listing it as three pending rows
+    // would have the worker drive out once and leave two calls unclaimed.
+    expect(radar).toHaveLength(1);
+    expect(radar[0].trade).toBe("plumber");
+    expect(radar[0].sharedCount).toBe(2);
+    // The worker is shown the full visit price, not one household's slice.
+    expect(radar[0].total).toBe(129);
+    expect(radar[0].workerShare).toBe(116);
+  });
+
+  it("accepting a shared visit takes the whole trip, not one household", async () => {
+    const t = setupTest();
+    const a = await seedCustomer(t, { email: "a@example.com" });
+    const b = await seedCustomer(t, { email: "b@example.com" });
+    const p = await plumber(t);
+    const { groupId } = await openGroup(a.as, 2);
+    await b.as.mutation(api.bookingGroups.join, { id: groupId });
+
+    const { radar } = await p.as.query(api.bookings.listForWorker);
+    const took = await p.as.mutation(api.bookings.accept, { id: radar[0]._id });
+    expect(took).toBe(2);
+
+    // Nobody is left stranded on a "pending" job that nobody is coming to.
+    const rows = await groupRows(t, groupId);
+    expect(rows.every((r) => r.status === "accepted")).toBe(true);
+    expect(new Set(rows.map((r) => r.workerId)).size).toBe(1);
+
+    // And it leaves the radar, having been taken as a single job.
+    const after = await p.as.query(api.bookings.listForWorker);
+    expect(after.radar).toHaveLength(0);
   });
 
   it("enforces the trade rule on a group booking just like any other", async () => {

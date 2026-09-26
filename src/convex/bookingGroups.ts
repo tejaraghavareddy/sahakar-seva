@@ -59,7 +59,8 @@ async function bookingsInGroup(
  */
 export const nearbyOpen = query({
   args: {
-    trade: v.string(),
+    /** Omit to see shared visits across every trade. */
+    trade: v.optional(v.string()),
     lat: v.optional(v.number()),
     lng: v.optional(v.number()),
   },
@@ -72,7 +73,7 @@ export const nearbyOpen = query({
 
     const visible = [];
     for (const g of open) {
-      if (g.trade !== args.trade) continue;
+      if (args.trade && g.trade !== args.trade) continue;
       if (g.windowEnd <= now) continue;
       // Never surface a group to someone outside its own catchment.
       if (args.lat !== undefined && args.lng !== undefined) {
@@ -166,12 +167,12 @@ export const get = query({
       filled: rows.length,
       spotsLeft: g.maxShares - rows.length,
       participants: rows.map((b) => ({
-        // A member sees who else is in; a non-member never gets this list at
-        // all, and never sees anyone else's address.
-        customerId: b.customerId,
+        // Members see that other households are in, and nothing about who they
+        // are. A raw customer id would be a stable handle on a neighbour's
+        // account, and the other household's address is nobody's business.
+        isYou: b.customerId === userId,
         shareAmount: b.shareAmount ?? null,
         paid: b.participantPaid ?? false,
-        address: b.customerId === userId ? b.address : null,
       })),
     };
   },

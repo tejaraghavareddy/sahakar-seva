@@ -6,6 +6,35 @@
    Merged into the dictionaries at module load (see initBnGateway in i18n.tsx). */
 
 export const SKILL_HI: Record<string, string> = {
+  /* Worker profile */
+  wp_directory: "कारीगर — जिन्होंने काम के लिए भुगतान किया, उनके द्वारा रेट किए गए",
+  wp_missing: "कारीगर नहीं मिला।",
+  wp_reputation: "प्रतिष्ठा",
+  wp_no_reviews: "अभी कोई रेटिंग नहीं",
+  wp_years: "साल का अनुभव",
+  wp_credential: "सहकारी प्रमाणपत्र",
+  wp_skill_on: "काम के प्रमाण स्वीकृत",
+  wp_skill_verified: "काम सत्यापित",
+  wp_work_verified: "काम सत्यापित",
+  wp_online: "अभी उपलब्ध",
+  wp_work: "इस कारीगर का प्रकाशित काम",
+  wp_top_rated: "सर्वोच्च रेटिंग",
+  wp_tap: "प्रोफ़ाइल खोलें",
+
+  /* Demand outlook */
+  dl_title: "इस हफ़्ते आपका व्यवसाय",
+  dl_high: "उच्च माँग की उम्मीद",
+  dl_elevated: "सामान्य से अधिक माँग",
+  dl_normal: "सामान्य माँग",
+  dl_footnote: "मौसम, त्योहार कैलेंडर और हाल के काम से फ़ेडरेशन का अनुमान — काम का वादा नहीं।",
+
+  /* Availability */
+  av_title: "आप कब उपलब्ध हैं",
+  av_sub: "वह भाग दिन बताएँ जब आप काम ले सकते हैं। ग्राहक इसी के आधार पर बुकिंग करते हैं, इसलिए इसे सच रखें।",
+  av_morning: "सुबह",
+  av_afternoon: "दोपहर",
+  av_evening: "शाम",
+
   /* Reputation */
   rv_title: "ग्राहक समीक्षाएँ",
   rv_none: "अभी कोई समीक्षा नहीं — पहली समीक्षा आप दें",
@@ -39,6 +68,12 @@ export const SKILL_HI: Record<string, string> = {
   gb_how_many: "कितने परिवार?",
   gb_your_share: "आपका हिस्सा",
   gb_joined_banner: "यह एक साझा विज़िट है",
+  gb_visit: "विज़िट",
+  gb_details: "विवरण",
+  gb_in: "में",
+  gb_spots_left: "जगह बाकी:",
+  gb_others: "परिवार पहले से जुड़े हैं",
+  gb_leave: "यह साझा विज़िट छोड़ें",
 
   /* Voice */
   vr_tap: "लिखने के बजाय बोलकर बताएँ",
@@ -134,6 +169,35 @@ export const SKILL_HI: Record<string, string> = {
 };
 
 export const SKILL_TE: Record<string, string> = {
+  /* Worker profile */
+  wp_directory: "కార్మికులు — చెల్లించిన వారి రేటింగ్ ప్రకారం",
+  wp_missing: "కార్మికుడు కనబడలేదు.",
+  wp_reputation: "కీర్తి",
+  wp_no_reviews: "ఇంకా రేటింగ్ లేదు",
+  wp_years: "సంవత్సరాల అనుభవం",
+  wp_credential: "సహకార బట్టీ",
+  wp_skill_on: "పని ఆధారాలు ఆమోదించబడ్డాయి",
+  wp_skill_verified: "పని ధృవీకరించబడింది",
+  wp_work_verified: "పని ధృవీకరించబడింది",
+  wp_online: "ఇప్పుడు అందుబాటులో",
+  wp_work: "ఈ కార్మికుడు ప్రచురించిన పని",
+  wp_top_rated: "అత్యధిక రేటింగ్",
+  wp_tap: "ప్రొఫైల్ తెరవండి",
+
+  /* Demand outlook */
+  dl_title: "ఈ వారం మీ వృత్తి",
+  dl_high: "అధిక డిమాండ్ అంచునా",
+  dl_elevated: "సాధారణంగా కంటే ఎక్కువ",
+  dl_normal: "సాధారణ డిమాండ్",
+  dl_footnote: "వాతావరణం, పండుగ క్యాలెండర్, ఇటీవలి పని ఆధారంగా ఫెడరేషన్ అంచనా — పని హామీ కాదు.",
+
+  /* Availability */
+  av_title: "మీరు ఎప్పుడు అందుబాటులో",
+  av_sub: "మీరు పనులు తీసుకోగల భాగాన్ని సేట్ చేయండి. కస్టమర్లు దీని ఆధారంగానే బుకింగ్ చేస్తారు, కాబట్టి సత్యంగా ఉంచండి.",
+  av_morning: "ఉదయం",
+  av_afternoon: "మధ్యాహ్నం",
+  av_evening: "సాయంత్రం",
+
   /* Reputation */
   rv_title: "కస్టమర్ సమీక్షలు",
   rv_none: "ఇంకా సమీక్షలు లేవు — మొదటి సమీక్ష మీరు ఇవ్వండి",
@@ -167,6 +231,12 @@ export const SKILL_TE: Record<string, string> = {
   gb_how_many: "ఎన్ని కుటుంబాలు?",
   gb_your_share: "మీ వాటా",
   gb_joined_banner: "ఇది ఉమ్మడి విజిట్",
+  gb_visit: "విజిట్",
+  gb_details: "వివరాలు",
+  gb_in: "లో",
+  gb_spots_left: "ఖాళీ స్థానాలు:",
+  gb_others: "కుటుంబాలు ఇప్పటికే చేరాయి",
+  gb_leave: "ఈ ఉమ్మడి విజిట్ నుండి విడిచి వెళ్ళండి",
 
   /* Voice */
   vr_tap: "రాయడానికి బదులు మాట్లాడండి",
@@ -263,6 +333,40 @@ export const SKILL_TE: Record<string, string> = {
 };
 
 export const SKILL_BN: Record<string, string> = {
+  dl_title: "এই সপ্তাহে আপনার পেশা",
+  dl_high: "উচ্চ চাহিদার আশা",
+  dl_elevated: "স্বাভাবিকের চেয়ে বেশি",
+  dl_normal: "স্বাভাবিক চাহিদা",
+  dl_footnote: "আবহাওয়া, উৎসব ক্যালেন্ডার ও সাম্প্রতিক কাজ থেকে ফেডারেশনের অনুমান — কাজের প্রতিশ্রুতি নয়।",
+
+  av_title: "আপনি কখন উপলব্ধ",
+  av_sub: "আপনি কাজ নিতে পারেন এমন দিনের সময় চিহ্নিত করুন। গ্রাহকরা এর ভিত্তিতেই বুক করেন, তাই সৎ রাখুন।",
+  av_morning: "সকাল",
+  av_afternoon: "দুপুর",
+  av_evening: "সন্ধ্যা",
+
+  gb_visit: "সেবা",
+  gb_details: "বিস্তারিত",
+  gb_in: "এ",
+  gb_spots_left: "খালি জায়গা:",
+  gb_others: "পরিবার আগেই যোগ দিয়েছে",
+  gb_leave: "এই যৌথ সেবা ছেড়ে দিন",
+
+  /* Worker profile */
+  wp_directory: "কারিগর — যাঁরা পেমেন্ট করেছেন তাঁদের রেটিং অনুযায়ী",
+  wp_missing: "কারিগর পাওয়া যায়নি।",
+  wp_reputation: "সুনাম",
+  wp_no_reviews: "এখনও রেটিং নেই",
+  wp_years: "বছরের অভিজ্ঞতা",
+  wp_credential: "সহকারী সনদ",
+  wp_skill_on: "কাজের প্রমাণ অনুমোদিত",
+  wp_skill_verified: "কাজ যাচাই করা",
+  wp_work_verified: "কাজ যাচাই করা",
+  wp_online: "এখন উপলব্ধ",
+  wp_work: "এই কারিগর প্রকাশ করা কাজ",
+  wp_top_rated: "সর্বোচ্চ রেটিং",
+  wp_tap: "প্রোফাইল খুলুন",
+
   /* Reputation */
   rv_title: "ক্রেতাদের রিভিউ",
   rv_none: "এখনও কোনো রিভিউ নেই — প্রথম রিভিউটি দিন",

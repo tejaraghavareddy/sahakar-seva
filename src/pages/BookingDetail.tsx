@@ -66,6 +66,15 @@ export default function BookingDetail() {
     api.reviews.forBooking,
     booking ? { bookingId: booking._id } : "skip",
   );
+  // A swap that nobody claimed has to fall back to the original worker
+  // eventually, or the customer is left holding a job that nobody is coming to.
+  // There is no cron here; loading the booking *is* the trigger, and the
+  // mutation is a no-op until the window has genuinely lapsed.
+  const expireSwap = useMutation(api.bookings.expireSwap);
+  useEffect(() => {
+    if (!booking?.swapRequestedAt || booking.status !== "pending") return;
+    void expireSwap({ id: booking._id }).catch(() => {});
+  }, [booking?.swapRequestedAt, booking?.status, booking?._id, expireSwap]);
   // The raiser is the only participant who needs to see the verdict, so the
   // arbitration board's decision is read back here rather than staying admin-only.
   const myDispute = useQuery(

@@ -4,6 +4,8 @@ import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { Link } from "react-router";
 import { BackToHome } from "@/components/BackToHome";
+import SlotEditor from "@/components/SlotEditor";
+import DemandOutlook from "@/components/DemandOutlook";
 import { useAuth } from "@/hooks/use-auth";
 import { useLang } from "@/lib/i18n";
 import { getTrade } from "@/lib/trades";
@@ -371,6 +373,20 @@ export default function Dashboard() {
           </div>
         )}
 
+        {/* Weekly availability — what the catalog shows customers */}
+        {artisan && (
+          <div className="mt-6">
+            <SlotEditor slots={artisan.slots ?? 0} />
+          </div>
+        )}
+
+        {/* What this worker's own trade looks like this week */}
+        {artisan && (
+          <div className="mt-5">
+            <DemandOutlook />
+          </div>
+        )}
+
         {artisan && (
           <div className="mt-6 grid gap-5 lg:grid-cols-3">
             {/* AI Demand & Fair-Price Forecasting */}
@@ -529,6 +545,14 @@ export default function Dashboard() {
                             ✦ {t("wc_mine")}
                           </p>
                         )}
+                        {/* A shared visit is one trip for several households.
+                            Showing it as N jobs would have the worker drive out
+                            once and leave N-1 calls unclaimed. */}
+                        {b.sharedCount && b.sharedCount > 1 ? (
+                          <p className="text-[10px] font-black uppercase tracking-wide text-teal-700">
+                            ⌂ {b.sharedCount} {t("gb_households")} · 1 {t("gb_visit")}
+                          </p>
+                        ) : null}
                         <p className="truncate text-[11px] text-slate-500">
                           {b.address.slice(0, 44)} · ₹{b.total} · you earn ₹
                           {b.workerShare}

@@ -69,6 +69,11 @@ const schema = defineSchema(
 
       // STEP 4 — operational state
       isOnline: v.boolean(),
+      // Coarse working slots, as bit flags over the 7 days of the coming week.
+      // 1 = available. Deliberately coarse: a household books "Thursday
+      // evening", not an instant, and a fine-grained calendar is a lie about
+      // what a worker walking between three jobs can actually promise.
+      slots: v.optional(v.number()),
       lat: v.optional(v.number()),
       lng: v.optional(v.number()),
       telemetryAt: v.optional(v.number()), // last GPS ping
@@ -101,7 +106,8 @@ const schema = defineSchema(
     })
       .index("by_userId", ["userId"])
       .index("by_trade", ["trade"])
-      .index("by_kyc", ["kycStatus"]),
+      .index("by_kyc", ["kycStatus"])
+      .index("by_slots", ["slots"]),
 
     // Customer bookings — full lifecycle dispatch
     bookings: defineTable({

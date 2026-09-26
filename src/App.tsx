@@ -32,6 +32,7 @@ const Dashboard = lazy(() => import("./pages/Dashboard.tsx"));
 const Onboarding = lazy(() => import("./pages/Onboarding.tsx"));
 const Services = lazy(() => import("./pages/Services.tsx"));
 const ServiceDetail = lazy(() => import("./pages/ServiceDetail.tsx"));
+const WorkerProfile = lazy(() => import("./pages/WorkerProfile.tsx"));
 const Book = lazy(() => import("./pages/Book.tsx"));
 const Bookings = lazy(() => import("./pages/Bookings.tsx"));
 const BookingDetail = lazy(() => import("./pages/BookingDetail.tsx"));
@@ -94,6 +95,7 @@ function viewFromPath(pathname: string): AppView {
   if (pathname.startsWith("/admin")) return "admin";
   if (
     pathname.startsWith("/services") ||
+    pathname.startsWith("/workers") ||
     pathname.startsWith("/book") ||
     pathname.startsWith("/bookings")
   ) {
@@ -267,6 +269,8 @@ export default function App() {
             {/* Customer portal — browse, book, pay, track */}
             <Route path="/services" element={<Services />} />
             <Route path="/services/:id" element={<ServiceDetail />} />
+            {/* A worker's public page — reputation, experience and reviews */}
+            <Route path="/workers/:id" element={<WorkerProfile />} />
             <Route
               path="/book/:id"
               element={

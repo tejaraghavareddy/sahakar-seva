@@ -17,6 +17,7 @@ import { useDetectedLocation, formatAccuracy } from "@/lib/useLocation";
 import { formatDistance } from "@/lib/geo";
 import { computeTradeAvailability, serviceAvailability } from "@/lib/availability";
 import GroupBookingCard from "@/components/GroupBookingCard";
+import WorkerCard from "@/components/WorkerCard";
 import SafetyModeToggle from "@/components/SafetyModeToggle";
 import RatingStars from "@/components/RatingStars";
 import {
@@ -51,6 +52,11 @@ export default function Services() {
   const artisans = useQuery(api.artisans.listArtisans, {});
   // Safety Mode is a customer preference held on the user record.
   const safetyMode = useQuery(api.bookings.mySafetyMode, {}) ?? false;
+  // The people behind the services: browsable, rated, comparable.
+  const workers = useQuery(
+    api.artisans.publicDirectory,
+    trade === "all" ? {} : { trade },
+  );
   // Work the workers themselves published, once the board approved it.
   const custom = useQuery(api.customServices.approvedCatalog, {});
 
@@ -321,10 +327,12 @@ export default function Services() {
             )}
 
             {/* Shared visits nearby — self-hides when there are none, so it can
-                sit above the grid without leaving a gap. */}
+                sit above the grid without leaving a gap. With no trade filter
+                the customer is shown co-demand across every trade, which is the
+                point: the pitch is "someone on your street needs this too". */}
             <div className="mt-4">
               <GroupBookingCard
-                trade={trade === "all" ? "plumber" : trade}
+                trade={trade === "all" ? undefined : trade}
                 lat={location?.lat}
                 lng={location?.lng}
               />
@@ -333,6 +341,21 @@ export default function Services() {
             <div className="mt-4 max-w-md">
               <SafetyModeToggle enabled={safetyMode} />
             </div>
+
+            {/* The workers themselves — reputation you can actually read */}
+            {workers && workers.length > 0 && (
+              <div className="mt-8">
+                <p className="flex items-center gap-1.5 text-xs font-bold text-slate-900">
+                  <Star className="size-3.5 fill-amber-400 text-amber-400" />
+                  {t("wp_directory")}
+                </p>
+                <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {workers.slice(0, 6).map((w) => (
+                    <WorkerCard key={w._id} worker={w} />
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div className="mt-6 grid gap-4 pb-14 sm:grid-cols-2 lg:grid-cols-3">
               {filtered.map((s) => {

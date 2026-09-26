@@ -27,9 +27,39 @@ const STORAGE_KEY = "sahakar.lang";
 type Dict = Record<string, string>;
 import { GW_BN, PORTAL_BN } from "./i18n.bn-gw";
 import { SKILL_BN, SKILL_HI, SKILL_TA, SKILL_TE } from "./i18n.skill";
+import { PROFILE_TA } from "./i18n.profile";
 
 const en: Dict = {
+  /* ── Demand outlook ── */
+  dl_title: "Your trade this week",
+  dl_high: "High demand expected",
+  dl_elevated: "Demand above normal",
+  dl_normal: "Normal demand",
+  dl_footnote:
+    "A federation estimate from weather, the festival calendar and recent local work — not a promise of jobs.",
+
+  /* ── Availability ── */
+  av_title: "When you are available",
+  av_sub:
+    "Set the parts of the day you can take jobs. Customers book against this, so keep it honest — it is what makes the visit charge feel worth it.",
+  av_morning: "Morning",
+  av_afternoon: "Afternoon",
+  av_evening: "Evening",
+
   /* ── Reputation ── */
+  wp_directory: "The workers — rated by people who paid them",
+  wp_missing: "Worker not found.",
+  wp_reputation: "Reputation",
+  wp_no_reviews: "No ratings yet",
+  wp_years: "yrs experience",
+  wp_credential: "Cooperative credential",
+  wp_skill_on: "Work evidence signed off",
+  wp_skill_verified: "Work verified",
+  wp_work_verified: "Work verified",
+  wp_online: "Available now",
+  wp_work: "Work this worker publishes",
+  wp_top_rated: "Top rated",
+  wp_tap: "Open profile",
   rv_title: "Customer reviews",
   rv_none: "No reviews yet — be the first to rate this worker",
   rv_write: "Rate this work",
@@ -66,6 +96,12 @@ const en: Dict = {
   gb_how_many: "How many households?",
   gb_your_share: "Your share",
   gb_joined_banner: "This is a shared visit",
+  gb_visit: "visit",
+  gb_details: "Details",
+  gb_in: "in",
+  gb_spots_left: "spots left:",
+  gb_others: "household(s) already in",
+  gb_leave: "Leave this shared visit",
 
   /* ── Voice request ── */
   vr_tap: "Speak your request instead of typing",
@@ -441,6 +477,7 @@ export function initBnGateway() {
   Object.assign(hi, SKILL_HI);
   Object.assign(te, SKILL_TE);
   Object.assign(ta, SKILL_TA);
+  Object.assign(ta, PROFILE_TA);
 }
 
 const hi: Dict = {

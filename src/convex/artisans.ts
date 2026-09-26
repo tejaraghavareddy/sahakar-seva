@@ -3,6 +3,7 @@ import { query, mutation, QueryCtx } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
 import { v } from "convex/values";
 import { OWNER_EMAIL, ensureOwnerRole, requireUser } from "./identity";
+import { SLOT_PARTS, type SlotPart } from "../lib/slots";
 
 /** Federation owner — granted admin role on first verification. */
 export { OWNER_EMAIL };
@@ -70,6 +71,130 @@ export const listArtisans = query({
         ratingAvg: a.ratingAvg ?? null,
         ratingCount: a.ratingCount ?? 0,
       }));
+  },
+});
+
+/* ── Public worker profiles ──
+ * The statement's opening complaint is that a customer "may find it difficult to
+ * choose a trustworthy worker". Verification badges alone do not answer that —
+ * a household choosing between two plumbers wants to see who they are, how long
+ * they have done this, and what the people who paid them said. These two queries
+ * are that answer, and they are the reason reviews are worth anything.
+ *
+ * Both are reachable with no session, so both are deliberate projections rather
+ * than whole artisan documents. Never widen them casually: `phone`, `idType`,
+ * `idLast4`, `upiVpa`, the cooperative balances and live GPS must not cross this
+ * boundary, and a customer's exact location is not a worker's to publish.
+ */
+
+/** Work counts per worker, tallied in a single pass over the booking table. */
+async function completionCounts(ctx: QueryCtx) {
+  const bookings = await ctx.db.query("bookings").collect();
+  const counts = new Map<Id<"artisans">, number>();
+  for (const b of bookings) {
+    if (!b.workerId) continue;
+    if (b.status !== "completed" && b.status !== "settled") continue;
+    counts.set(b.workerId, (counts.get(b.workerId) ?? 0) + 1);
+  }
+  return counts;
+}
+
+/**
+ * Browsable worker directory: who is available, in what trade, and how they are
+ * rated. Sorted best-rated-first among the workers who can actually be booked,
+ * because an unrated listing is not yet evidence of anything.
+ */
+export const publicDirectory = query({
+  args: { trade: v.optional(v.string()) },
+  handler: async (ctx, args) => {
+    const all = await ctx.db.query("artisans").order("desc").take(200);
+    const completed = await completionCounts(ctx);
+    const viewerId = await getAuthUserId(ctx);
+    const viewer = viewerId ? await ctx.db.get(viewerId) : null;
+    const safetyMode = viewer?.safetyMode === true;
+
+    return all
+      .filter((a) => !a.removedAt)
+      .filter((a) => (args.trade ? a.trade === args.trade : true))
+      .filter(
+        (a) =>
+          !safetyMode ||
+          (a.kycStatus === "verified" && a.skillStatus === "verified"),
+      )
+      // Only workers who can legally take a job: a KYC-checked, quiz-passed
+      // artisan. Listing anyone else would be offering a choice that will fail
+      // at accept time.
+      .filter((a) => a.kycStatus === "verified" && a.quizPassed)
+      .map((a) => ({
+        _id: a._id,
+        fullName: a.fullName,
+        trade: a.trade,
+        district: a.district,
+        state: a.state,
+        experienceYears: a.experienceYears,
+        kycStatus: a.kycStatus,
+        skillStatus: a.skillStatus ?? "pending",
+        // When this worker is actually around, so the catalog can say more than
+        // "online". A bitmask over the coming week — see lib/slots.ts.
+        slots: a.slots ?? 0,
+        ratingAvg: a.ratingAvg ?? null,
+        ratingCount: a.ratingCount ?? 0,
+        completedJobs: completed.get(a._id) ?? 0,
+        isOnline: a.isOnline,
+      }))
+      .sort(
+        (x, y) =>
+          y.ratingAvg! - x.ratingAvg! ||
+          y.ratingCount - x.ratingCount ||
+          Number(y.isOnline) - Number(x.isOnline),
+      )
+      .slice(0, 40);
+  },
+});
+
+/** One worker's public profile, with the aggregates a customer weighs. */
+export const profile = query({
+  args: { id: v.id("artisans") },
+  handler: async (ctx, args) => {
+    const a = await ctx.db.get(args.id);
+    if (!a || a.removedAt) return null;
+    const completed = await completionCounts(ctx);
+    const listings = await ctx.db
+      .query("customServices")
+      .withIndex("by_status", (q) => q.eq("status", "approved"))
+      .collect();
+
+    return {
+      _id: a._id,
+      fullName: a.fullName,
+      trade: a.trade,
+      district: a.district,
+      state: a.state,
+      experienceYears: a.experienceYears,
+      slots: a.slots ?? 0,
+      credentialId: a.credentialId ?? null,
+      kycStatus: a.kycStatus,
+      kycVerifiedAt: a.kycVerifiedAt ?? null,
+      skillStatus: a.skillStatus ?? "pending",
+      skillVerifiedAt: a.skillVerifiedAt ?? null,
+      ratingAvg: a.ratingAvg ?? null,
+      ratingCount: a.ratingCount ?? 0,
+      completedJobs: completed.get(a._id) ?? 0,
+      isOnline: a.isOnline,
+      // What this worker actually publishes — the public face of their craft.
+      // Excludes anything still sitting in the board's review queue.
+      listings: listings
+        .filter((l) => l.artisanId === a._id)
+        .map((l) => ({
+          _id: l._id,
+          name: l.name,
+          description: l.description,
+          category: l.category,
+          base: l.base,
+          hourly: l.hourly,
+          urgent: l.urgent,
+        })),
+    };
   },
 });
 
@@ -189,6 +314,36 @@ export const submitQuiz = mutation({
       credentialIssuedAt: now,
     });
     return { ok: true as const, credentialId };
+  },
+});
+
+/**
+ * Set a worker's availability for the coming week.
+ *
+ * Whole-week replacement rather than a per-slot toggle, so the payload is
+ * unambiguous and there is no way to accumulate orphaned bits. A day-index /
+ * part-of-day pair is `(day * 3) + part`, so the whole week is 21 bits.
+ */
+export const setSlots = mutation({
+  args: {
+    day: v.number(),
+    part: v.string(),
+    on: v.boolean(),
+  },
+  handler: async (ctx, args) => {
+    const userId = await requireUser(ctx);
+    const artisan = await getMyArtisanInternal(ctx, userId);
+    if (!artisan) throw new Error("Complete onboarding first.");
+    if (!Number.isInteger(args.day) || args.day < 0 || args.day >= 7) {
+      throw new Error("Invalid day");
+    }
+    const partIndex = SLOT_PARTS.indexOf(args.part as SlotPart);
+    if (partIndex < 0) throw new Error("Invalid part of day");
+    const bit = 1 << (args.day * SLOT_PARTS.length + partIndex);
+    const next = args.on
+      ? (artisan.slots ?? 0) | bit
+      : (artisan.slots ?? 0) & ~bit;
+    await ctx.db.patch(artisan._id, { slots: next });
   },
 });
 

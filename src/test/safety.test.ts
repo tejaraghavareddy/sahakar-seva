@@ -135,6 +135,62 @@ describe("bookings: Swap Service", () => {
       nosy.as.mutation(api.bookings.requestSwap, { id: bookingId }),
     ).rejects.toThrow(/Not your booking/);
   });
+
+  it("clears the swap flag when a worker accepts through the normal radar", async () => {
+    // Regression: `accept` used to leave `swapRequestedAt` set, so the customer
+    // kept seeing "finding you another worker…" against a job that had already
+    // been taken.
+    const t = setupTest();
+    const { first, bookingId } = await acceptedJob(t);
+    await first.as.mutation(api.bookings.releaseForSwap, { id: bookingId });
+
+    const second = await seedWorker(t, { email: "second@example.com" });
+    await seedArtisan(t, second.id, { trade: "plumber" });
+    await second.as.mutation(api.bookings.accept, { id: bookingId });
+
+    const b = must(await t.run((ctx) => ctx.db.get(bookingId)), "booking");
+    expect(b.status).toBe("accepted");
+    expect(b.swapRequestedAt).toBeUndefined();
+    expect(b.originalWorkerId).toBeUndefined();
+  });
+
+  it("stops a stood-down worker re-taking their own job through the radar", async () => {
+    // Regression: the check only existed on `claimSwap`, so the normal accept
+    // button let the original worker walk straight back in.
+    const t = setupTest();
+    const { first, bookingId } = await acceptedJob(t);
+    await first.as.mutation(api.bookings.releaseForSwap, { id: bookingId });
+    await expect(
+      first.as.mutation(api.bookings.accept, { id: bookingId }),
+    ).rejects.toThrow(/already your job/);
+  });
+
+  it("hands the job back to the original worker once the swap has expired", async () => {
+    const t = setupTest();
+    const { first, firstArtisan, bookingId } = await acceptedJob(t);
+    await first.as.mutation(api.bookings.releaseForSwap, { id: bookingId });
+    await t.run(async (ctx) => {
+      const b = must(await ctx.db.get(bookingId), "booking");
+      await ctx.db.patch(b._id, { swapRequestedAt: Date.now() - 6 * 3600_000 });
+    });
+    expect(
+      await first.as.mutation(api.bookings.expireSwap, { id: bookingId }),
+    ).toBe(true);
+
+    // Expiry reassigns rather than re-listing, so the job is already theirs and
+    // is no longer sitting on the radar waiting to be picked up.
+    const b = must(await t.run((ctx) => ctx.db.get(bookingId)), "booking");
+    expect(b.status).toBe("accepted");
+    expect(b.workerId).toBe(firstArtisan);
+    expect(b.originalWorkerId).toBeUndefined();
+    expect(b.swapRequestedAt).toBeUndefined();
+
+    // And a stale client clicking "accept" gets a clear answer, not a
+    // double-assignment.
+    await expect(
+      first.as.mutation(api.bookings.accept, { id: bookingId }),
+    ).rejects.toThrow(/No longer available/);
+  });
 });
 
 /* ── Emergency Quick Help ── */

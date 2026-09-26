@@ -262,7 +262,33 @@ export const listForWorker = query({
         myListing: myListingIds.has(b._id),
       });
     }
-    return { mine, radar: flagged.slice(0, 20) };
+
+    /**
+     * Collapse shared visits into one radar entry.
+     *
+     * Three households splitting one visit are ONE job — one trip, one rate, one
+     * worker. Listing them as three separate pending rows would have the worker
+     * accept one, drive out once, and leave two calls unclaimed while the two
+     * other households still show as "pending" in their own apps. The entry the
+     * worker sees is therefore the whole visit, and `accept` takes all of it.
+     */
+    const seenGroups = new Set<string>();
+    const collapsed: (typeof flagged[number] & { sharedCount?: number })[] = [];
+    for (const b of flagged) {
+      if (!b.groupId) {
+        collapsed.push(b);
+        continue;
+      }
+      if (seenGroups.has(b.groupId)) continue;
+      seenGroups.add(b.groupId);
+      const rows = await ctx.db
+        .query("bookings")
+        .withIndex("by_group", (q) => q.eq("groupId", b.groupId!))
+        .collect();
+      collapsed.push({ ...b, sharedCount: rows.length });
+    }
+
+    return { mine, radar: collapsed.slice(0, 20) };
   },
 });
 
@@ -349,13 +375,42 @@ export const accept = mutation({
     if (b.trade !== me.trade) {
       throw new Error("This job is not in your trade.");
     }
-    await ctx.db.patch(b._id, {
+    // A stood-down worker cannot re-take their own job through the front door
+    // while a swap is in flight; claimSwap holds the same rule.
+    if (b.originalWorkerId === me._id && b.swapRequestedAt) {
+      throw new Error("This job is already your job");
+    }
+
+    const patch = {
       status: "accepted",
       workerId: me._id,
       workerUserId: userId,
       workerVpa: me.upiVpa,
       acceptedAt: Date.now(),
-    });
+      // Accepting resolves any swap that was still open on this job.
+      swapRequestedAt: undefined,
+      originalWorkerId: undefined,
+    };
+    await ctx.db.patch(b._id, patch);
+
+    // A shared visit is one trip. Accepting any household of it takes the whole
+    // visit, so the worker drives out once instead of once per household and no
+    // payer is left stranded on a "pending" job that nobody is coming to.
+    let tookHouseholds = 1;
+    if (b.groupId) {
+      const siblings = await ctx.db
+        .query("bookings")
+        .withIndex("by_group", (q) => q.eq("groupId", b.groupId!))
+        .collect();
+      for (const row of siblings) {
+        if (row._id === b._id) continue;
+        // Anything already under way means this is not a clean single visit.
+        if (row.status !== "pending") continue;
+        await ctx.db.patch(row._id, patch);
+        tookHouseholds += 1;
+      }
+    }
+    return tookHouseholds;
   },
 });
 

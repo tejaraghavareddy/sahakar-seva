@@ -2,8 +2,10 @@ import { useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { Loader2 } from "lucide-react";
 import { api } from "@/convex/_generated/api";
+import type { Id } from "@/convex/_generated/dataModel";
 import { useLang } from "@/lib/i18n";
 import { Panel } from "@/components/terminal";
+import GroupDetail from "@/components/GroupDetail";
 
 /**
  * "3 people near you need a plumber this evening."
@@ -18,15 +20,17 @@ export default function GroupBookingCard({
   lat,
   lng,
 }: {
-  trade: string;
+  /** Omit to show co-demand across every trade. */
+  trade?: string;
   lat?: number;
   lng?: number;
 }) {
   const { t } = useLang();
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [openId, setOpenId] = useState<string | null>(null);
   const groups = useQuery(
     api.bookingGroups.nearbyOpen,
-    trade ? { trade, lat, lng } : "skip",
+    lat !== undefined ? { trade, lat, lng } : { trade },
   );
   const join = useMutation(api.bookingGroups.join);
 
@@ -57,8 +61,9 @@ export default function GroupBookingCard({
         {groups.map((g) => (
           <li
             key={g._id}
-            className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-teal-200 bg-white px-3 py-2.5"
+            className="rounded-xl border border-teal-200 bg-white px-3 py-2.5"
           >
+            <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="min-w-0 flex-1">
               <p className="truncate text-xs font-bold text-slate-900">
                 {g.serviceName}
@@ -75,17 +80,33 @@ export default function GroupBookingCard({
                 {g.spotsLeft} {t("gb_spots")}
               </p>
             </div>
-            <button
-              type="button"
-              onClick={() => void doJoin(g._id)}
-              disabled={busyId === g._id || g.spotsLeft <= 0}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-teal-700 px-3 py-1.5 text-[11px] font-bold text-white transition hover:bg-teal-800 active:scale-95 disabled:opacity-50"
-            >
-              {busyId === g._id ? (
-                <Loader2 className="size-3 animate-spin" />
-              ) : null}
-              {g.spotsLeft <= 0 ? t("gb_full") : t("gb_join")}
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setOpenId(openId === g._id ? null : g._id)}
+                className="rounded-lg border border-slate-200 px-2 py-1.5 text-[11px] font-bold text-slate-600 transition hover:bg-slate-50"
+              >
+                {t("gb_details")}
+              </button>
+              <button
+                type="button"
+                onClick={() => void doJoin(g._id)}
+                disabled={busyId === g._id || g.spotsLeft <= 0}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-teal-700 px-3 py-1.5 text-[11px] font-bold text-white transition hover:bg-teal-800 active:scale-95 disabled:opacity-50"
+              >
+                {busyId === g._id ? (
+                  <Loader2 className="size-3 animate-spin" />
+                ) : null}
+                {g.spotsLeft <= 0 ? t("gb_full") : t("gb_join")}
+              </button>
+            </div>
+            {openId === g._id && (
+              <GroupDetail
+                groupId={g._id as Id<"bookingGroups">}
+                onLeft={() => setOpenId(null)}
+              />
+            )}
+            </div>
           </li>
         ))}
       </ul>
