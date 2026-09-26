@@ -1,26 +1,11 @@
-import { getAuthUserId } from "@convex-dev/auth/server";
-import { query, mutation, QueryCtx, MutationCtx } from "./_generated/server";
-import { DEMO_ADMIN_EMAILS } from "./admin";
+import { query, mutation, MutationCtx } from "./_generated/server";
+import { isAdminUser, requireUser } from "./identity";
 import { Id } from "./_generated/dataModel";
 import { v } from "convex/values";
 import type { Doc } from "./_generated/dataModel";
 
 const MAX_SAMPLES = 6;
 const MAX_BYTES = 5 * 1024 * 1024; // 5 MB per image
-
-async function requireUser(ctx: QueryCtx | MutationCtx) {
-  const userId = await getAuthUserId(ctx);
-  if (userId === null) throw new Error("Not authenticated");
-  return userId;
-}
-
-async function isAdminUser(ctx: QueryCtx | MutationCtx, userId: Id<"users">): Promise<boolean> {
-  const user = await ctx.db.get(userId);
-  if (!user) return false;
-  if (user.email === "teja200822@gmail.com") return true;
-  if (DEMO_ADMIN_EMAILS.includes(user.email ?? "")) return true;
-  return user.role === "admin";
-}
 
 async function notify(
   ctx: MutationCtx,

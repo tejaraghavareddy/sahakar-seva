@@ -8,9 +8,8 @@
  * themselves. Everything goes to the board first; only approved listings reach
  * the customer catalog.
  */
-import { getAuthUserId } from "@convex-dev/auth/server";
 import { query, mutation, QueryCtx, MutationCtx } from "./_generated/server";
-import { DEMO_ADMIN_EMAILS } from "./admin";
+import { isAdminUser, requireUser } from "./identity";
 import { consume } from "./rateLimit";
 import { Id } from "./_generated/dataModel";
 import { v } from "convex/values";
@@ -29,8 +28,7 @@ const TRADES = [
   "appliance",
 ] as const;
 
-const MAX_LISTINGS = 8;
-const MAX_NAME = 60;
+const MAX_LISTINGS = 8;const MAX_NAME = 60;
 const MAX_DESC = 240;
 const MAX_CATEGORY = 40;
 const MAX_BASE = 20000;
@@ -44,23 +42,6 @@ export function parseCustomServiceId(serviceId: string): string | null {
   if (!serviceId.startsWith(CUSTOM_PREFIX)) return null;
   const raw = serviceId.slice(CUSTOM_PREFIX.length);
   return raw.length > 0 ? raw : null;
-}
-
-async function requireUser(ctx: QueryCtx | MutationCtx) {
-  const userId = await getAuthUserId(ctx);
-  if (userId === null) throw new Error("Not authenticated");
-  return userId;
-}
-
-async function isAdminUser(
-  ctx: QueryCtx | MutationCtx,
-  userId: Id<"users">,
-): Promise<boolean> {
-  const user = await ctx.db.get(userId);
-  if (!user) return false;
-  if (user.email === "teja200822@gmail.com") return true;
-  if (DEMO_ADMIN_EMAILS.includes(user.email ?? "")) return true;
-  return user.role === "admin";
 }
 
 async function myArtisan(

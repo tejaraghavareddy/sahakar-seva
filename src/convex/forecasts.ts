@@ -1,26 +1,6 @@
-import { getAuthUserId } from "@convex-dev/auth/server";
-import { query, mutation, QueryCtx } from "./_generated/server";
-import { DEMO_ADMIN_EMAILS } from "./admin";
-import { Id } from "./_generated/dataModel";
+import { query, mutation } from "./_generated/server";
+import { isAdminUser, requireUser } from "./identity";
 import { v } from "convex/values";
-
-async function requireUser(ctx: QueryCtx) {
-  const userId = await getAuthUserId(ctx);
-  if (userId === null) throw new Error("Not authenticated");
-  return userId;
-}
-
-async function isAdminUser(
-  ctx: QueryCtx,
-  userId: Id<"users">,
-): Promise<boolean> {
-  const user = await ctx.db.get(userId);
-  if (!user) return false;
-  if (user.email === "teja200822@gmail.com") return true;
-  // Demo admin (removable — see DEMO_ADMIN_EMAILS in admin.ts)
-  if (DEMO_ADMIN_EMAILS.includes(user.email ?? "")) return true;
-  return user.role === "admin";
-}
 
 /** Save a forecast or stabilization snapshot produced by the AI engine. */
 export const save = mutation({

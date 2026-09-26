@@ -23,6 +23,8 @@ import {
 } from "lucide-react";
 import LocationPickerModal from "@/components/map/LocationPickerModal";
 import { RevenueSplitBar } from "@/components/RevenueSplit";
+import VoiceRequest from "@/components/VoiceRequest";
+import { Users, Siren } from "lucide-react";
 
 const SLOTS = [
   "09:00",
@@ -48,6 +50,8 @@ export default function Book() {
   const listing = custom ?? null;
   const shown = svc ?? (listing ? listingAsService(listing) : undefined);
   const createBooking = useMutation(api.bookings.create);
+  const createGroup = useMutation(api.bookingGroups.create);
+  const createEmergency = useMutation(api.bookings.createEmergency);
 
   const today = useMemo(() => new Date(), []);
   const dates = useMemo(
@@ -71,6 +75,12 @@ export default function Book() {
   const [lat, setLat] = useState<number | undefined>();
   const [lng, setLng] = useState<number | undefined>();
   const [showMap, setShowMap] = useState(false);
+  // Shared visit: one worker trip, several households, one price between them.
+  const [share, setShare] = useState(false);
+  const [shares, setShares] = useState(3);
+  // Set when a spoken request was matched to a trade, so the customer can see
+  // what the platform understood before they commit.
+  const [heard, setHeard] = useState<string | null>(null);
 
   if (!shown) {
     if (isCustomServiceId(id ?? "") && custom === undefined) {
@@ -97,7 +107,13 @@ export default function Book() {
   const workerShare = Math.round(shown.base * 0.9);
   const welfareAmt = Math.round(shown.base * 0.07);
   const opsAmt = shown.base - workerShare - welfareAmt;
+  // The worker is always paid the full visit price. Sharing changes what the
+  // household pays, never what the artisan earns.
   const total = shown.base;
+  // Mirrors the server's split exactly: whole rupees per head, with the
+  // rounding remainder carried by the first household to join.
+  const perHeadBase = Math.floor(total / shares);
+  const perHead = share ? perHeadBase + (total - perHeadBase * shares) : total;
   const soft = COLOR_SOFT[shown.color] ?? COLOR_SOFT.ok;
   const Icon = shown.icon;
 
@@ -113,6 +129,20 @@ export default function Book() {
       const scheduled = new Date(dates[dateIdx]);
       const [hh, mm] = slot.split(":");
       scheduled.setHours(Number(hh), Number(mm), 0, 0);
+      if (share) {
+        const { bookingId } = await createGroup({
+          serviceId: shown.id,
+          address,
+          lat,
+          lng,
+          scheduledFor: scheduled.getTime(),
+          maxShares: shares,
+          notes: notes || undefined,
+          welfareOptIn: true,
+        });
+        navigate(`/bookings/${bookingId}`);
+        return;
+      }
       const bookingId = await createBooking({
         serviceId: shown.id,
         address: address,
@@ -126,6 +156,26 @@ export default function Book() {
       navigate(`/bookings/${bookingId}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to book");
+      setBusy(false);
+    }
+  }
+
+  /** Emergency Quick Help — no form, no waiting for a slot. */
+  async function sendEmergency() {
+    if (!shown) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const id = await createEmergency({
+        serviceId: shown.id,
+        address,
+        lat,
+        lng,
+        notes: notes || undefined,
+      });
+      navigate(`/bookings/${id}`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to send");
       setBusy(false);
     }
   }
@@ -289,7 +339,7 @@ export default function Book() {
             )}
           </Panel>
 
-          {/* Notes */}
+          {/* Notes — typeable or spoken */}
           <Panel title={t("bk_notes")}>
             <textarea
               className="min-h-[60px] w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 transition placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
@@ -297,7 +347,98 @@ export default function Book() {
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
             />
+            <div className="mt-3">
+              <VoiceRequest
+                onTranscript={(text) => {
+                  setNotes(text);
+                  setHeard(text);
+                }}
+              />
+            </div>
+            {heard && (
+              <p className="mt-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11px] leading-relaxed text-emerald-800">
+                {t("vr_heard")} “{heard}”
+              </p>
+            )}
           </Panel>
+
+          {/* Shared visit — the cooperative cost-split */}
+          <Panel title={t("gb_share_opt")} bodyClassName="p-4">
+            <p className="text-[11px] leading-relaxed text-slate-600">
+              {t("gb_share_sub")}
+            </p>
+            <button
+              type="button"
+              onClick={() => setShare((v) => !v)}
+              className={`mt-3 flex w-full items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left transition active:scale-[0.98] ${
+                share
+                  ? "border-teal-600 bg-teal-600 text-white"
+                  : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+              }`}
+            >
+              <span className="flex items-center gap-2 text-xs font-bold">
+                <Users className="size-4" />
+                {share ? t("gb_joined") : t("gb_share_opt")}
+              </span>
+              <span
+                className={`relative h-5 w-9 shrink-0 rounded-full border transition-colors ${
+                  share ? "border-white/50 bg-white/30" : "border-slate-200 bg-slate-100"
+                }`}
+              >
+                <span
+                  className={`absolute top-0.5 size-4 rounded-full bg-white shadow transition-all ${
+                    share ? "left-[18px]" : "left-0.5"
+                  }`}
+                />
+              </span>
+            </button>
+
+            {share && (
+              <>
+                <p className="tl-label mt-3">{t("gb_how_many")}</p>
+                <div className="mt-1.5 flex gap-1.5">
+                  {[2, 3, 4].map((n) => (
+                    <button
+                      key={n}
+                      type="button"
+                      onClick={() => setShares(n)}
+                      className={`flex-1 rounded-xl border px-3 py-2 text-xs font-bold transition ${
+                        shares === n
+                          ? "border-teal-600 bg-teal-600 text-white"
+                          : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                      }`}
+                    >
+                      {n}
+                    </button>
+                  ))}
+                </div>
+                <p className="mt-3 rounded-xl border border-teal-200 bg-teal-50 px-3 py-2 text-[11px] leading-relaxed text-teal-900">
+                  {t("gb_your_share")} ₹{perHead} · {t("gb_note")}
+                </p>
+              </>
+            )}
+          </Panel>
+
+          {/* Emergency Quick Help */}
+          {shown.urgent && (
+            <Panel className="border-rose-200 bg-rose-50/50" bodyClassName="p-4">
+              <p className="flex items-center gap-1.5 text-xs font-bold text-rose-800">
+                <Siren className="size-4" />
+                {t("em_title")}
+              </p>
+              <p className="mt-1.5 text-[11px] leading-relaxed text-rose-900/80">
+                {t("em_sub")}
+              </p>
+              <button
+                type="button"
+                onClick={() => void sendEmergency()}
+                disabled={busy || !address.trim()}
+                className="mt-3 w-full rounded-xl bg-rose-600 px-4 py-2.5 text-xs font-bold text-white transition hover:bg-rose-700 active:scale-95 disabled:opacity-50"
+              >
+                {t("em_cta")}
+              </button>
+            </Panel>
+          )}
 
           {/* Cooperative distribution notice */}
           <Panel className="border-orange-200 bg-orange-50/50" bodyClassName="p-4">
@@ -360,6 +501,16 @@ export default function Book() {
                 <span className="font-bold text-slate-900">{t("bk_total")}</span>
                 <span className="font-bold text-slate-900">₹{total}</span>
               </div>
+              {share && (
+                <div className="mt-1.5 flex justify-between rounded-xl bg-teal-50 px-3 py-2">
+                  <span className="text-xs font-bold text-teal-800">
+                    {t("gb_your_share")}
+                  </span>
+                  <span className="text-xs font-black text-teal-900">
+                    ₹{perHead}
+                  </span>
+                </div>
+              )}
             </div>
               <div className="mt-3 border-t border-slate-200 pt-3">
                 <RevenueSplitBar

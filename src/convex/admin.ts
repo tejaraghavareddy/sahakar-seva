@@ -1,31 +1,18 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
-import { query, mutation, QueryCtx, MutationCtx } from "./_generated/server";
+import { query, mutation, MutationCtx } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
 import { v } from "convex/values";
+import {
+  DEMO_ADMIN_EMAILS,
+  isAdminUser,
+  requireUser,
+} from "./identity";
 
 /**
- * DEMO ADMIN — this account exists only for demo/testing purposes and can be
- * removed at any time by deleting the DEMO_ADMIN_EMAILS entry below.
+ * Re-exported so existing imports keep working. The rule itself now lives in
+ * identity.ts, which every function module shares.
  */
-export const DEMO_ADMIN_EMAILS = ["demo.admin@sahakar.demo"];
-
-async function requireUser(ctx: QueryCtx) {
-  const userId = await getAuthUserId(ctx);
-  if (userId === null) throw new Error("Not authenticated");
-  return userId;
-}
-
-async function isAdminUser(
-  ctx: QueryCtx,
-  userId: Id<"users">,
-): Promise<boolean> {
-  const user = await ctx.db.get(userId);
-  if (!user) return false;
-  if (user.email === "teja200822@gmail.com") return true;
-  // Demo admin (removable — see DEMO_ADMIN_EMAILS above)
-  if (DEMO_ADMIN_EMAILS.includes(user.email ?? "")) return true;
-  return user.role === "admin";
-}
+export { DEMO_ADMIN_EMAILS };
 
 /* ── Audit ledger ───────────────────────────────────────────── */
 

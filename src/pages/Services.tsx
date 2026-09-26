@@ -12,10 +12,13 @@ import {
 } from "@/lib/trades";
 import { AppHeader } from "@/components/AppHeader";
 import { BackToHome } from "@/components/BackToHome";
-import { MonoBadge } from "@/components/terminal";
+import { MonoBadge, Panel } from "@/components/terminal";
 import { useDetectedLocation, formatAccuracy } from "@/lib/useLocation";
 import { formatDistance } from "@/lib/geo";
 import { computeTradeAvailability, serviceAvailability } from "@/lib/availability";
+import GroupBookingCard from "@/components/GroupBookingCard";
+import SafetyModeToggle from "@/components/SafetyModeToggle";
+import RatingStars from "@/components/RatingStars";
 import {
   Search,
   ArrowRight,
@@ -29,6 +32,7 @@ import {
   Navigation,
   Sparkles,
   Hammer,
+  Star,
 } from "lucide-react";
 
 type Tab = "artisans" | "radar" | "orders";
@@ -45,6 +49,8 @@ export default function Services() {
   const { location, detect } = useDetectedLocation();
 
   const artisans = useQuery(api.artisans.listArtisans, {});
+  // Safety Mode is a customer preference held on the user record.
+  const safetyMode = useQuery(api.bookings.mySafetyMode, {}) ?? false;
   // Work the workers themselves published, once the board approved it.
   const custom = useQuery(api.customServices.approvedCatalog, {});
 
@@ -99,6 +105,24 @@ export default function Services() {
   }, [q, trade, location, sortByDistance, emergencyMode, artisans]);
 
   const nearest = filtered.length > 0 ? filtered[0] : null;
+
+  /**
+   * Federation reputation, aggregated from the directory projection. Every one
+   * of these ratings is anchored to a booking that reached `completed`, so this
+   * number cannot be inflated by anyone who has not paid for work.
+   */
+  const reputation = useMemo(() => {
+    const rows = (artisans ?? []).filter(
+      (a) => (a.ratingCount ?? 0) > 0 && typeof a.ratingAvg === "number",
+    );
+    const count = rows.reduce((s, a) => s + (a.ratingCount ?? 0), 0);
+    const avg =
+      count === 0
+        ? null
+        : rows.reduce((s, a) => s + a.ratingAvg! * (a.ratingCount ?? 0), 0) /
+          count;
+    return { avg, count, rated: rows.length };
+  }, [artisans]);
 
   return (
     <div className="flex min-h-screen flex-col bg-gradient-to-b from-slate-50 via-emerald-50/30 to-slate-100 font-sans text-slate-900 antialiased">
@@ -228,6 +252,25 @@ export default function Services() {
         {/* ── Tab content ───────────────────────────────────── */}
         {tab === "artisans" && (
           <>
+            {/* Federation reputation */}
+            {reputation.avg !== null && (
+              <Panel className="mt-4" bodyClassName="p-4">
+                <p className="flex items-center gap-1.5 text-xs font-bold text-slate-900">
+                  <Star className="size-3.5 fill-amber-400 text-amber-400" />
+                  {t("rv_fed_title")}
+                  <span className="ml-auto text-[10px] font-semibold text-slate-400">
+                    {reputation.rated} {t("rv_workers")}
+                  </span>
+                </p>
+                <div className="mt-2 flex flex-wrap items-center gap-3">
+                  <RatingStars value={reputation.avg} count={reputation.count} size="md" />
+                  <p className="text-[11px] leading-relaxed text-slate-500">
+                    {t("rv_fed_sub")}
+                  </p>
+                </div>
+              </Panel>
+            )}
+
             <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-2.5 size-4 text-slate-400" />
@@ -277,7 +320,20 @@ export default function Services() {
               </p>
             )}
 
-            {/* Grid */}
+            {/* Shared visits nearby — self-hides when there are none, so it can
+                sit above the grid without leaving a gap. */}
+            <div className="mt-4">
+              <GroupBookingCard
+                trade={trade === "all" ? "plumber" : trade}
+                lat={location?.lat}
+                lng={location?.lng}
+              />
+            </div>
+
+            <div className="mt-4 max-w-md">
+              <SafetyModeToggle enabled={safetyMode} />
+            </div>
+
             <div className="mt-6 grid gap-4 pb-14 sm:grid-cols-2 lg:grid-cols-3">
               {filtered.map((s) => {
                 const Icon = s.icon;

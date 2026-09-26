@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { SAFETY_WITHHELD_ADDRESS } from "@/convex/bookings";
 import { useAuth } from "@/hooks/use-auth";
 import { useLang } from "@/lib/i18n";
 import type { Id } from "@/convex/_generated/dataModel";
@@ -21,6 +22,9 @@ import {
 import { QRCodeSVG } from "qrcode.react";
 import CustomerRealtimeRadarMap from "@/components/map/CustomerRealtimeRadarMap";
 import { RevenueSplitBar } from "@/components/RevenueSplit";
+import ReviewForm from "@/components/ReviewForm";
+import RatingStars from "@/components/RatingStars";
+import { Repeat2, Users } from "lucide-react";
 
 const FLOW = [
   "pending",
@@ -56,6 +60,12 @@ export default function BookingDetail() {
   const confirmUtr = useMutation(api.bookings.confirmUtr);
   const cancelBooking = useMutation(api.bookings.cancel);
   const raiseDispute = useMutation(api.disputes.raise);
+  const requestSwap = useMutation(api.bookings.requestSwap);
+  const releaseForSwap = useMutation(api.bookings.releaseForSwap);
+  const myReview = useQuery(
+    api.reviews.forBooking,
+    booking ? { bookingId: booking._id } : "skip",
+  );
   // The raiser is the only participant who needs to see the verdict, so the
   // arbitration board's decision is read back here rather than staying admin-only.
   const myDispute = useQuery(
@@ -71,6 +81,7 @@ export default function BookingDetail() {
   const [flagCategory, setFlagCategory] = useState("quality");
   const [flagDetails, setFlagDetails] = useState("");
   const [flagBusy, setFlagBusy] = useState(false);
+  const [swapBusy, setSwapBusy] = useState(false);
   const radar = useQuery(
     api.gis.radar,
     ["accepted", "enroute", "inprogress"].includes(booking?.status ?? "") && booking
@@ -171,6 +182,32 @@ export default function BookingDetail() {
     }
   }
 
+  /** Ask the federation to find a different worker for this booking. */
+  async function handleSwap() {
+    if (!booking) return;
+    setSwapBusy(true);
+    try {
+      await requestSwap({ id: booking._id });
+    } catch {
+      // surfaced via Convex error
+    } finally {
+      setSwapBusy(false);
+    }
+  }
+
+  /** The assigned worker hands the job back to their trade's pool. */
+  async function handleRelease() {
+    if (!booking) return;
+    setSwapBusy(true);
+    try {
+      await releaseForSwap({ id: booking._id });
+    } catch {
+      // surfaced via Convex error
+    } finally {
+      setSwapBusy(false);
+    }
+  }
+
   async function handleFlag() {
     if (!booking) return;
     setFlagBusy(true);
@@ -231,6 +268,33 @@ export default function BookingDetail() {
             {t(`st_${booking.status}`)}
           </MonoBadge>
         </div>
+
+        {/* Shared visit banner — one worker trip, several households */}
+        {booking.shareCount && booking.shareCount > 1 && (
+          <div className="mt-4 flex items-start gap-2 rounded-xl border border-teal-200 bg-teal-50 px-3 py-2.5 text-xs text-teal-900">
+            <Users className="mt-0.5 size-4 shrink-0 text-teal-700" />
+            <span className="leading-relaxed">
+              {t("gb_joined_banner")} — {t("gb_your_share")}{" "}
+              <strong>₹{booking.shareAmount}</strong> {t("gb_of")}{" "}
+              {booking.shareCount} {t("gb_households")}. {t("gb_note")}
+            </span>
+          </div>
+        )}
+
+        {/* Swap in progress */}
+        {booking.swapRequestedAt && booking.status === "pending" && (
+          <div className="mt-4 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-900">
+            <Repeat2 className="mt-0.5 size-4 shrink-0 text-amber-600" />
+            <span className="leading-relaxed">{t("sw_pending")}</span>
+          </div>
+        )}
+
+        {/* Safety Mode — the address is withheld by the server, this says why */}
+        {isWorker && booking.address === SAFETY_WITHHELD_ADDRESS && (
+          <div className="mt-4 rounded-xl border border-teal-200 bg-teal-50 px-3 py-2.5 text-[11px] leading-relaxed text-teal-900">
+            {t("sf_active")} — {t("sf_withheld")}
+          </div>
+        )}
 
         {/* Stepper */}
         {booking.status !== "cancelled" && (
@@ -445,7 +509,48 @@ export default function BookingDetail() {
                   )}
                   {t("bd_advance", { stage: t(stageKeys[booking.status]) })}
                 </TlButton>
+                <button
+                  type="button"
+                  onClick={handleRelease}
+                  disabled={swapBusy}
+                  className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-600 transition hover:bg-slate-50 active:scale-95 disabled:opacity-50"
+                >
+                  {t("sw_release")}
+                </button>
               </Panel>
+            )}
+
+            {/* Swap Service — customer asks, the trade's pool answers */}
+            {isCustomer && !booking.swapRequestedAt && (
+              <button
+                type="button"
+                onClick={handleSwap}
+                disabled={swapBusy || !booking.workerUserId}
+                className="w-full rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs font-bold text-amber-800 transition hover:bg-amber-100 active:scale-95 disabled:opacity-50"
+              >
+                {t("sw_ask")}
+              </button>
+            )}
+
+            {/* Reputation — a review of work that actually happened */}
+            {isCustomer && ["completed", "settled"].includes(booking.status) && (
+              myReview ? (
+                <Panel title={t("rv_title")} bodyClassName="p-4">
+                  <div className="flex items-center gap-2">
+                    <RatingStars value={myReview.rating} size="md" />
+                    <span className="text-[11px] font-semibold text-emerald-700">
+                      {t("rv_posted")}
+                    </span>
+                  </div>
+                  {myReview.comment && (
+                    <p className="mt-2 text-xs leading-relaxed text-slate-600">
+                      “{myReview.comment}”
+                    </p>
+                  )}
+                </Panel>
+              ) : (
+                <ReviewForm bookingId={booking._id} />
+              )
             )}
 
             {/* Bill summary with cooperative split */}

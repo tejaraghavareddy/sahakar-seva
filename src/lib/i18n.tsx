@@ -29,6 +29,88 @@ import { GW_BN, PORTAL_BN } from "./i18n.bn-gw";
 import { SKILL_BN, SKILL_HI, SKILL_TA, SKILL_TE } from "./i18n.skill";
 
 const en: Dict = {
+  /* ── Reputation ── */
+  rv_title: "Customer reviews",
+  rv_none: "No reviews yet — be the first to rate this worker",
+  rv_write: "Rate this work",
+  rv_stars: "Tap to rate",
+  rv_avg: "Average rating {n} out of 5",
+  rv_count: "reviews",
+  rv_workers: "rated workers",
+  rv_comment_ph: "What went well, or what did not?",
+  rv_submit: "Post review",
+  rv_posted: "Review posted — thank you",
+  rv_tag_on_time: "On time",
+  rv_tag_clean_work: "Clean work",
+  rv_tag_fair_price: "Fair price",
+  rv_tag_polite: "Courteous",
+  rv_fed_title: "Federation reputation",
+  rv_fed_sub:
+    "Every rating below is tied to a booking that was completed and paid for.",
+
+  /* ── Shared visits ── */
+  gb_title: "Shared visits nearby",
+  gb_sub:
+    "Neighbours booking the same job in the same window split one visit. One worker trip, less for every household.",
+  gb_join: "Join",
+  gb_full: "Full",
+  gb_of: "of",
+  gb_households: "households",
+  gb_spots: "spots left",
+  gb_note:
+    "Grouped visits are one trip for the worker — they are paid the full rate, not a fraction of it.",
+  gb_share_opt: "Share this visit with neighbours",
+  gb_share_sub:
+    "Find nearby households who need the same work in the same window, and split the visit charge between you.",
+  gb_joined: "Shared visit on",
+  gb_how_many: "How many households?",
+  gb_your_share: "Your share",
+  gb_joined_banner: "This is a shared visit",
+
+  /* ── Voice request ── */
+  vr_tap: "Speak your request instead of typing",
+  vr_listening: "Listening…",
+  vr_heard: "We heard",
+  vr_privacy:
+    "Speech is processed on your device and never uploaded. Only the resulting text is stored on the booking.",
+
+  /* ── Safety Mode ── */
+  sf_title: "Safety Mode",
+  sf_sub:
+    "For booking a stranger into your home. Shows only fully verified workers, and hides your address from the worker until they set off.",
+  sf_on: "Safety Mode is on",
+  sf_off: "Turn Safety Mode on",
+  sf_active: "Safety Mode is active for this booking",
+  sf_withheld:
+    "The customer is sharing their address only once you are on your way.",
+
+  /* ── Swap Service ── */
+  sw_ask: "This worker isn't available — find me another",
+  sw_pending: "Finding you another verified worker of this trade…",
+  sw_release: "I can't make it — hand this job on",
+
+  /* ── Emergency Quick Help ── */
+  em_title: "Emergency quick help",
+  em_sub:
+    "Pages every verified worker of this trade near you, right now, and the first to accept takes the job.",
+  em_cta: "Send emergency request",
+
+  /* ── Social security ── */
+  wf_title: "Social security",
+  wf_sub:
+    "What your work is worth, read off the cooperative's own settlement record.",
+  wf_none:
+    "Complete a booking and the cooperative can start reading your income against these schemes.",
+  wf_based: "Based on what the cooperative has recorded for you",
+  wf_trade: "Trade",
+  wf_income: "Recorded annual income",
+  wf_jobs: "Jobs completed",
+  wf_eligible: "You likely qualify",
+  wf_check: "Check this first",
+  wf_criteria: "Eligibility criteria",
+  wf_apply: "Open the government portal",
+  wf_privacy:
+    "Nothing is applied for here. The cooperative never holds your Aadhaar, your login or your documents — you use the official portal yourself.",
   gw_op_badge: "Federation live — dispatching now",
   gw_eyebrow: "Cooperative-owned · Union-governed",
   gw_title_a: "The artisan federation that works for artisans.",

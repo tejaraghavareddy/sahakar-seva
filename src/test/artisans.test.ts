@@ -74,13 +74,60 @@ describe("artisans:listArtisans", () => {
     });
 
     const list = await t.query(api.artisans.listArtisans);
-    // Only what the availability maths reads may cross the public boundary.
-    expect(Object.keys(list[0]).sort()).toEqual(["kycStatus", "lat", "lng", "trade"]);
+    // Only what the catalog actually reads may cross the public boundary: the
+    // availability maths, the KYC badge, and the reputation score the catalog
+    // sorts by. Widen this list only deliberately.
+    expect(Object.keys(list[0]).sort()).toEqual([
+      "kycStatus",
+      "lat",
+      "lng",
+      "ratingAvg",
+      "ratingCount",
+      "trade",
+    ]);
 
     const serialized = JSON.stringify(list);
     for (const secret of ["9876543210", "asha@upi", "4321", "Asha", "700"]) {
       expect(serialized).not.toContain(secret);
     }
+  });
+
+  it("hides workers who are not fully verified from a Safety Mode customer", async () => {
+    const t = setupTest();
+    const w = await seedWorker(t);
+    await seedArtisan(t, w.id, {
+      kycStatus: "verified",
+      skillStatus: "verified",
+      lat: 15.83,
+      lng: 78.03,
+    });
+    // Same KYC, but the board has not yet looked at the work evidence.
+    const w2 = await seedWorker(t, { email: "second@example.com" });
+    await seedArtisan(t, w2.id, {
+      kycStatus: "verified",
+      skillStatus: "pending",
+      lat: 15.83,
+      lng: 78.03,
+    });
+    // And one still awaiting KYC entirely.
+    const w3 = await seedWorker(t, { email: "third@example.com" });
+    await seedArtisan(t, w3.id, {
+      kycStatus: "pending",
+      skillStatus: "verified",
+      lat: 15.83,
+      lng: 78.03,
+    });
+
+    // Everyone can see the open directory.
+    const open = await t.query(api.artisans.listArtisans);
+    expect(open).toHaveLength(3);
+
+    const c = await seedCustomer(t, { email: "safety@example.com" });
+    await t.run(async (ctx) => ctx.db.patch(c.id, { safetyMode: true }));
+
+    const filtered = await c.as.query(api.artisans.listArtisans);
+    expect(filtered).toHaveLength(1);
+    expect(filtered[0].kycStatus).toBe("verified");
   });
 });
 

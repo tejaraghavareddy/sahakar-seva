@@ -1,35 +1,21 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
-import { query, mutation, QueryCtx, MutationCtx } from "./_generated/server";
+import { query, mutation, QueryCtx } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
 import { v } from "convex/values";
+import { OWNER_EMAIL, ensureOwnerRole, requireUser } from "./identity";
 
 /** Federation owner — granted admin role on first verification. */
-export const OWNER_EMAIL = "teja200822@gmail.com";
+export { OWNER_EMAIL };
 
 const QUIZ_PASS_MARK = 60;
 
-async function requireUserId(ctx: QueryCtx) {
-  const userId = await getAuthUserId(ctx);
-  if (userId === null) throw new Error("Not authenticated");
-  return userId;
-}
+const requireUserId = requireUser;
 
 async function getMyArtisanInternal(ctx: QueryCtx, userId: Id<"users">) {
   return await ctx.db
     .query("artisans")
     .withIndex("by_userId", (q) => q.eq("userId", userId))
     .first();
-}
-
-/**
- * Promote the federation owner email to admin role. Called opportunistically
- * after sign-in gated mutations; harmless no-op for everyone else.
- */
-async function ensureOwnerRole(ctx: MutationCtx, userId: Id<"users">) {
-  const user = await ctx.db.get(userId);
-  if (!user || user.email !== OWNER_EMAIL) return;
-  if (user.role === "admin") return;
-  await ctx.db.patch(userId, { role: "admin" });
 }
 
 export const getMyArtisan = query({
@@ -51,19 +37,38 @@ export const getMyArtisan = query({
  * balances and live GPS. Only the four fields the availability maths actually
  * reads are projected out — anything a new caller needs must be added here
  * deliberately rather than inherited by accident.
+ *
+ * `ratingAvg`/`ratingCount` are aggregates over completed work, not identity
+ * data, and the catalog needs them to sort by reputation.
  */
 export const listArtisans = query({
   args: {},
   handler: async (ctx) => {
     const all = await ctx.db.query("artisans").order("desc").take(200);
+    // Safety Mode narrows the directory to fully verified workers for a
+    // customer who asked for it. It is a filter on the same projection, not a
+    // second, differently-shaped query that could drift out of sync.
+    const viewerId = await getAuthUserId(ctx);
+    const viewer = viewerId ? await ctx.db.get(viewerId) : null;
+    const safetyMode = viewer?.safetyMode === true;
+
     return all
       .filter((a) => !a.removedAt)
+      .filter(
+        (a) =>
+          !safetyMode ||
+          (a.kycStatus === "verified" && a.skillStatus === "verified"),
+      )
       .slice(0, 50)
       .map((a) => ({
         trade: a.trade,
         kycStatus: a.kycStatus,
         lat: a.lat,
         lng: a.lng,
+        // Reputation, so the catalog can sort by it. Derived from completed
+        // work only — see reviews.ts.
+        ratingAvg: a.ratingAvg ?? null,
+        ratingCount: a.ratingCount ?? 0,
       }));
   },
 });

@@ -29,6 +29,11 @@ const schema = defineSchema(
       isAnonymous: v.optional(v.boolean()), // is the user anonymous. do not remove
 
       role: v.optional(roleValidator), // role of the user. do not remove
+
+      // Safety Mode — a customer-side preference, not an identity claim. When on,
+      // the customer only ever sees fully verified workers and their exact
+      // address stays hidden from the worker until they set off.
+      safetyMode: v.optional(v.boolean()),
     }).index("email", ["email"]), // index for the email. do not remove or modify
 
     // add other tables here
@@ -73,6 +78,16 @@ const schema = defineSchema(
       removedBy: v.optional(v.id("users")),
       removalNote: v.optional(v.string()),
 
+      // Reputation — denormalised from the `reviews` table on every write so the
+      // public directory can sort by rating without a fan-out join.
+      ratingAvg: v.optional(v.number()), // 1..5, mean of all reviews
+      ratingCount: v.optional(v.number()),
+
+      // Swap Service — how often this worker stood down and handed a job back to
+      // the pool. Tracked, never punished: it is a signal for the board, not a
+      // score.
+      declinedSwaps: v.optional(v.number()),
+
       // Skill verification — set by the board after reviewing work evidence.
       skillStatus: v.optional(v.string()), // "pending" | "verified" | "rejected"
       skillVerifiedAt: v.optional(v.number()),
@@ -109,6 +124,21 @@ const schema = defineSchema(
       total: v.number(),
       status: v.string(), // pending|accepted|enroute|inprogress|payment|completed|settled|cancelled
       customServiceId: v.optional(v.id("customServices")), // set when the booked work is a worker-created listing
+      // Shared booking — one group visit, several households. `base`/`total` stay
+      // the full job price the worker is paid; `shareAmount` is this
+      // customer's slice of it.
+      groupId: v.optional(v.id("bookingGroups")),
+      shareCount: v.optional(v.number()), // households sharing this visit
+      shareAmount: v.optional(v.number()), // total / shareCount
+      participantPaid: v.optional(v.boolean()),
+      // Swap Service — set when the customer asks for a different worker. The
+      // booking stays live; it is re-offered to the pool.
+      swapRequestedAt: v.optional(v.number()),
+      swapCount: v.optional(v.number()),
+      originalWorkerId: v.optional(v.id("artisans")), // stood down by a swap, restorable if nobody claims it
+      // Emergency Quick Help — a broadcast job, pinned to the top of the radar
+      // and rate limited far more tightly than a normal booking.
+      emergency: v.optional(v.boolean()),
       workerId: v.optional(v.id("artisans")), // assigned on accept
       workerUserId: v.optional(v.id("users")),
       workerVpa: v.optional(v.string()), // worker's own UPI id — funds go straight to them
@@ -123,7 +153,49 @@ const schema = defineSchema(
       .index("by_customer", ["customerId"])
       .index("by_worker", ["workerUserId"])
       .index("by_status", ["status"])
-      .index("by_created", ["createdAt"]),
+      .index("by_created", ["createdAt"])
+      .index("by_group", ["groupId"]),
+
+    // Shared ("group") bookings — the cooperative cost-split. Several nearby
+    // households agree on one visit for one service in one window, and the
+    // worker does one job instead of three. A group only becomes real work when
+    // it fills (maxShares reached); the worker price is unchanged, so the
+    // federation's 90/7/3 split is applied to the full amount, once.
+    bookingGroups: defineTable({
+      serviceId: v.string(),
+      customServiceId: v.optional(v.id("customServices")),
+      trade: v.string(),
+      serviceName: v.string(),
+      lat: v.optional(v.number()), // neighbourhood centroid
+      lng: v.optional(v.number()),
+      radiusM: v.number(), // how far a household may be and still share
+      windowStart: v.number(),
+      windowEnd: v.number(),
+      maxShares: v.number(), // 2..4 households
+      status: v.string(), // "open" | "full" | "dispatched" | "expired" | "cancelled"
+      note: v.optional(v.string()),
+      createdBy: v.id("users"),
+      createdAt: v.number(),
+    })
+      .index("by_status", ["status"])
+      .index("by_trade", ["trade"])
+      .index("by_creator", ["createdBy"]),
+
+    // Customer reputation — the second half of the trust story. Verification says
+    // "this worker is who they claim to be"; a review says "they did the work
+    // well". One review per completed booking, enforced in the mutation.
+    reviews: defineTable({
+      bookingId: v.id("bookings"), // the completed booking this is anchored to
+      customerId: v.id("users"),
+      artisanId: v.id("artisans"),
+      rating: v.number(), // 1..5
+      comment: v.optional(v.string()),
+      tags: v.optional(v.array(v.string())), // on_time | clean_work | fair_price | polite
+      createdAt: v.number(),
+    })
+      .index("by_artisan", ["artisanId"])
+      .index("by_booking", ["bookingId"])
+      .index("by_customer", ["customerId"]),
 
     // District cooperative societies — formal registration pipeline
     societies: defineTable({

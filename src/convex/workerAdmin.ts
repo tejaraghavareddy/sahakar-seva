@@ -1,30 +1,8 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
-import { query, mutation, QueryCtx, MutationCtx } from "./_generated/server";
-import { DEMO_ADMIN_EMAILS } from "./admin";
+import { query, mutation, MutationCtx } from "./_generated/server";
+import { requireAdmin, requireUser } from "./identity";
 import { Id } from "./_generated/dataModel";
 import { v } from "convex/values";
-
-/* ── helpers (mirrors other modules) ── */
-
-async function requireUser(ctx: QueryCtx) {
-  const userId = await getAuthUserId(ctx);
-  if (userId === null) throw new Error("Not authenticated");
-  return userId;
-}
-
-async function isAdminUser(ctx: QueryCtx, userId: Id<"users">): Promise<boolean> {
-  const user = await ctx.db.get(userId);
-  if (!user) return false;
-  if (user.email === "teja200822@gmail.com") return true;
-  if (DEMO_ADMIN_EMAILS.includes(user.email ?? "")) return true;
-  return user.role === "admin";
-}
-
-async function requireAdmin(ctx: QueryCtx) {
-  const userId = await requireUser(ctx);
-  if (!(await isAdminUser(ctx, userId))) throw new Error("Forbidden");
-  return userId;
-}
 
 /** Insert a notification row for a user. */
 async function notify(

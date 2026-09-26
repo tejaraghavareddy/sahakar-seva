@@ -36,6 +36,7 @@ const Book = lazy(() => import("./pages/Book.tsx"));
 const Bookings = lazy(() => import("./pages/Bookings.tsx"));
 const BookingDetail = lazy(() => import("./pages/BookingDetail.tsx"));
 const Admin = lazy(() => import("./pages/Admin.tsx"));
+const Welfare = lazy(() => import("./pages/Welfare.tsx"));
 const NotFound = lazy(() => import("./pages/NotFound.tsx"));
 
 /* ── Application view & session model ───────────────────────── */
@@ -89,6 +90,7 @@ function viewFromPath(pathname: string): AppView {
   if (pathname.startsWith("/dashboard") || pathname.startsWith("/onboarding")) {
     return "worker";
   }
+  if (pathname.startsWith("/welfare")) return "worker";
   if (pathname.startsWith("/admin")) return "admin";
   if (
     pathname.startsWith("/services") ||
@@ -304,6 +306,14 @@ export default function App() {
               element={
                 <RequireAuth>
                   <Onboarding />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/welfare"
+              element={
+                <RequireAuth>
+                  <Welfare />
                 </RequireAuth>
               }
             />

@@ -36,6 +36,18 @@ export const LIMITS = {
   listing: { max: 10, windowMs: HOUR },
   /** Raising a dispute on the same booking. */
   dispute: { max: 5, windowMs: DAY },
+  /** Joining or opening a shared ("group") booking. */
+  group: { max: 5, windowMs: HOUR },
+  /** Emergency Quick Help broadcasts. Deliberately tight: this is the endpoint
+   *  that pages real workers, so a script here is a cost to the cooperative and
+   *  a nuisance to every verified tradesperson in the district. */
+  emergency: { max: 3, windowMs: HOUR },
+  /** Writing a customer review. */
+  review: { max: 10, windowMs: HOUR },
+  /** Swap Service — asking for a different worker. */
+  swap: { max: 5, windowMs: HOUR },
+  /** Turning Safety Mode on or off. */
+  safety: { max: 10, windowMs: DAY },
 } as const;
 
 export type RateLimitScope = keyof typeof LIMITS;

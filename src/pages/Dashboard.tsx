@@ -28,6 +28,7 @@ import {
   Radar,
   Briefcase,
   HandHeart,
+  HandCoins,
   Bell,
   UserPlus,
   UserMinus,
@@ -230,6 +231,13 @@ export default function Dashboard() {
             </span>
           </Link>
           <div className="flex items-center gap-2">
+            <Link
+              to="/welfare"
+              className="hidden items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-[11px] font-bold text-emerald-700 transition hover:bg-emerald-100 sm:inline-flex"
+            >
+              <HandCoins className="size-3.5" />
+              {t("wf_title")}
+            </Link>
             <LanguagePicker />
             <TlButton variant="ghost" onClick={handleSignOut}>
               <LogOut className="size-4" />

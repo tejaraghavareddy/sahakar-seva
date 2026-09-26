@@ -1,6 +1,6 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { query, mutation, QueryCtx, MutationCtx } from "./_generated/server";
-import { DEMO_ADMIN_EMAILS } from "./admin";
+import { isAdminUser, requireUser } from "./identity";
 import { consume } from "./rateLimit";
 import { parseCustomServiceId } from "./customServices";
 import { Doc, Id } from "./_generated/dataModel";
@@ -44,7 +44,7 @@ const SERVICE_PRICES: Record<string, ServicePrice> = {
 };
 
 /** Pricing for a service, from the standard catalog or a worker listing. */
-interface PricedService {
+export interface PricedService {
   trade: string;
   name: string;
   base: number;
@@ -57,7 +57,7 @@ interface PricedService {
  * Resolve the price of the requested service. `cs_<id>` addresses a
  * worker-created listing, which is only bookable once the board approved it.
  */
-async function priceService(
+export async function priceService(
   ctx: QueryCtx | MutationCtx,
   serviceId: string,
 ): Promise<PricedService | null> {
@@ -102,29 +102,11 @@ const NEXT_STATUS: Record<string, string> = {
 
 /* ── helpers ── */
 
-async function requireUser(ctx: QueryCtx) {
-  const userId = await getAuthUserId(ctx);
-  if (userId === null) throw new Error("Not authenticated");
-  return userId;
-}
-
 async function getMyArtisan(ctx: QueryCtx, userId: Id<"users">) {
   return await ctx.db
     .query("artisans")
     .withIndex("by_userId", (q) => q.eq("userId", userId))
     .first();
-}
-
-async function isAdminUser(
-  ctx: QueryCtx,
-  userId: Id<"users">,
-): Promise<boolean> {
-  const user = await ctx.db.get(userId);
-  if (!user) return false;
-  if (user.email === "teja200822@gmail.com") return true;
-  // Demo admin (removable — see DEMO_ADMIN_EMAILS in admin.ts)
-  if (DEMO_ADMIN_EMAILS.includes(user.email ?? "")) return true;
-  return user.role === "admin";
 }
 
 async function canSeeBooking(
@@ -136,6 +118,39 @@ async function canSeeBooking(
   if (b.customerId === userId) return true;
   if (b.workerUserId === userId) return true;
   return await isAdminUser(ctx, userId);
+}
+
+/** Statuses from which a worker is already on the way to the address. */
+const ON_THE_WAY = new Set(["enroute", "inprogress", "payment", "completed", "settled"]);
+
+/**
+ * Safety Mode address redaction.
+ *
+ * A woman or an elderly customer booking a stranger into her home is the exact
+ * situation the mode exists for, and the one thing that makes it real is
+ * withholding the address until the worker has demonstrably set off. A worker who
+ * has not left yet has no legitimate reason to know the door they are heading to,
+ * and a booking id is all it takes to ask.
+ *
+ * Redaction happens in the query, not in the component, so the raw address never
+ * reaches the client at all — a masked string in the UI over a full address in
+ * the payload would be security theatre.
+ */
+const ADDRESS_WITHHELD = "Address shared when the worker sets off";
+/** Exported so the UI can recognise the redaction marker without duplicating it. */
+export const SAFETY_WITHHELD_ADDRESS = ADDRESS_WITHHELD;
+
+async function bookingForViewer(
+  ctx: QueryCtx,
+  userId: Id<"users">,
+  b: Doc<"bookings">,
+) {
+  const isCustomer = b.customerId === userId;
+  if (isCustomer || !b.workerUserId) return b;
+  if (ON_THE_WAY.has(b.status)) return b;
+  const customer = await ctx.db.get(b.customerId);
+  if (!customer?.safetyMode) return b;
+  return { ...b, address: ADDRESS_WITHHELD };
 }
 
 /* ── customer: create ── */
@@ -216,12 +231,22 @@ export const listForWorker = query({
       .order("desc")
       .take(50);
     const all = await ctx.db.query("bookings").order("desc").take(200);
-    const radar = all.filter(
+    const pending = all.filter(
       (b) =>
         b.status === "pending" &&
         b.trade === me.trade &&
         b.workerUserId === undefined,
     );
+    // Emergency Quick Help sits at the top of the radar for its trade: a burst
+    // main or a dead lockout should not sit behind tomorrow's repainting.
+    const radar = [...pending].sort((a, b) => {
+      if (a.emergency !== b.emergency) return a.emergency ? -1 : 1;
+      // Swapped jobs are also surfaced ahead — someone is waiting on a re-match.
+      const aSwap = a.swapRequestedAt ? 1 : 0;
+      const bSwap = b.swapRequestedAt ? 1 : 0;
+      if (aSwap !== bSwap) return bSwap - aSwap;
+      return b.createdAt - a.createdAt;
+    });
     // Flag the entries that came from this worker's own published listing so
     // the hub can mark them as their own category of work.
     const myListingIds = new Set<string>();
@@ -230,10 +255,13 @@ export const listForWorker = query({
       const listing = await ctx.db.get(b.customServiceId);
       if (listing?.userId === userId) myListingIds.add(b._id);
     }
-    const flagged = radar.map((b) => ({
-      ...b,
-      myListing: myListingIds.has(b._id),
-    }));
+    const flagged = [];
+    for (const b of radar) {
+      flagged.push({
+        ...(await bookingForViewer(ctx, userId, b)),
+        myListing: myListingIds.has(b._id),
+      });
+    }
     return { mine, radar: flagged.slice(0, 20) };
   },
 });
@@ -255,7 +283,7 @@ export const getBooking = query({
     const userId = await requireUser(ctx);
     const b = await ctx.db.get(args.id);
     if (!b || !(await canSeeBooking(ctx, userId, b))) return null;
-    return b;
+    return await bookingForViewer(ctx, userId, b);
   },
 });
 
@@ -373,6 +401,233 @@ export const confirmUtr = mutation({
         });
       }
     }
+  },
+});
+
+/* ── Swap Service ──
+ * "Your worker isn't available? We'll find another."
+ *
+ * The booking is never cancelled by a swap. The customer keeps the job, the
+ * original artisan simply stops being the one who will do it, and the trade's
+ * job radar picks the booking back up. Cancelling would throw away the customer
+ * history and the queue position for what is usually a scheduling problem, not
+ * a complaint.
+ */
+
+/** How long a swap sits unclaimed before the original worker is restored. */
+const SWAP_WINDOW_MS = 2 * 60 * 60; // 2 hours
+
+export const requestSwap = mutation({
+  args: { id: v.id("bookings") },
+  handler: async (ctx, args) => {
+    const userId = await requireUser(ctx);
+    await consume(ctx, "swap", userId);
+    const b = await ctx.db.get(args.id);
+    if (!b) throw new Error("Booking not found");
+    if (b.customerId !== userId) throw new Error("Not your booking");
+    if (["completed", "settled", "cancelled"].includes(b.status)) {
+      throw new Error("This booking can no longer be swapped");
+    }
+    if (b.swapRequestedAt) throw new Error("A swap is already in progress");
+    await ctx.db.patch(b._id, {
+      swapRequestedAt: Date.now(),
+      swapCount: (b.swapCount ?? 0) + 1,
+    });
+  },
+});
+
+/** The original worker hands the job back to their trade's pool. */
+export const releaseForSwap = mutation({
+  args: { id: v.id("bookings") },
+  handler: async (ctx, args) => {
+    const userId = await requireUser(ctx);
+    const b = await ctx.db.get(args.id);
+    if (!b) throw new Error("Booking not found");
+    if (b.workerUserId !== userId) throw new Error("Not your job");
+    if (["completed", "settled", "cancelled"].includes(b.status)) {
+      throw new Error("This job is already finished");
+    }
+    // Re-offered to the trade, and the standing worker is stood down. Tracked
+    // as a neutral signal for the board — never a penalty. Their id is kept so
+    // the job can go back to them if nobody else picks it up.
+    if (b.workerId) {
+      const w = await ctx.db.get(b.workerId);
+      if (w) {
+        await ctx.db.patch(w._id, {
+          declinedSwaps: (w.declinedSwaps ?? 0) + 1,
+        });
+      }
+    }
+    await ctx.db.patch(b._id, {
+      status: "pending",
+      workerId: undefined,
+      workerUserId: undefined,
+      workerVpa: undefined,
+      acceptedAt: undefined,
+      originalWorkerId: b.workerId,
+      swapRequestedAt: Date.now(),
+    });
+  },
+});
+
+/**
+ * Give a swapped job back to the worker who stood down, once the swap window has
+ * passed unclaimed.
+ *
+ * There is no cron here on purpose: the customer (or any signed-in member
+ * looking at the job) triggers the check when they next load it, and the
+ * mutation is a no-op unless the deadline has genuinely passed. What matters is
+ * that a job can never sit in limbo with no worker and no way back.
+ */
+export const expireSwap = mutation({
+  args: { id: v.id("bookings") },
+  handler: async (ctx, args) => {
+    // Any signed-in member looking at the job can trigger the check; it is a
+    // no-op until the deadline genuinely passes, so authorisation is not the
+    // concern here — the window is.
+    await requireUser(ctx);
+    const b = await ctx.db.get(args.id);
+    if (!b) throw new Error("Booking not found");
+    if (b.status !== "pending" || !b.swapRequestedAt) return false;
+    if (Date.now() - b.swapRequestedAt < SWAP_WINDOW_MS) return false;
+    if (!b.originalWorkerId) {
+      // Nobody to go back to — clear the swap so the radar offers it normally.
+      await ctx.db.patch(b._id, { swapRequestedAt: undefined });
+      return false;
+    }
+    const w = await ctx.db.get(b.originalWorkerId);
+    if (!w || w.removedAt || w.kycStatus !== "verified") {
+      await ctx.db.patch(b._id, {
+        swapRequestedAt: undefined,
+        originalWorkerId: undefined,
+      });
+      return false;
+    }
+    await ctx.db.patch(b._id, {
+      status: "accepted",
+      workerId: w._id,
+      workerUserId: w.userId,
+      workerVpa: w.upiVpa,
+      acceptedAt: Date.now(),
+      swapRequestedAt: undefined,
+      originalWorkerId: undefined,
+    });
+    return true;
+  },
+});
+
+/** Any other verified worker of the same trade can pick a swapped job up. */
+export const claimSwap = mutation({
+  args: { id: v.id("bookings") },
+  handler: async (ctx, args) => {
+    const userId = await requireUser(ctx);
+    const me = await getMyArtisan(ctx, userId);
+    if (!me || !me.quizPassed || me.kycStatus !== "verified") {
+      throw new Error("Verified credential required to take this job.");
+    }
+    const b = await ctx.db.get(args.id);
+    if (!b) throw new Error("Booking not found");
+    if (b.status !== "pending" || !b.swapRequestedAt) {
+      throw new Error("This job is not open for swap");
+    }
+    // Same rule as the radar: the trade gate is enforced in the mutation, not
+    // trusted from the UI.
+    if (b.trade !== me.trade) throw new Error("This job is not in your trade.");
+    // The worker who stood down has no `workerUserId` any more, so identity is
+    // checked against the remembered original — they may take the job back
+    // themselves, but not by going round the front door as a stranger.
+    if (b.workerUserId === userId || b.originalWorkerId === me._id) {
+      throw new Error("This is already your job");
+    }
+    await ctx.db.patch(b._id, {
+      status: "accepted",
+      workerId: me._id,
+      workerUserId: userId,
+      workerVpa: me.upiVpa,
+      acceptedAt: Date.now(),
+      swapRequestedAt: undefined,
+      originalWorkerId: undefined,
+    });
+  },
+});
+
+/* ── Emergency Quick Help ──
+ * A broadcast, not a filter. An urgent request pages every verified worker of
+ * that trade inside the radius, and the first to accept takes it.
+ */
+
+export const createEmergency = mutation({
+  args: {
+    serviceId: v.string(),
+    address: v.string(),
+    lat: v.optional(v.number()),
+    lng: v.optional(v.number()),
+    notes: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const userId = await requireUser(ctx);
+    // Tightest budget in the app. This endpoint pages real people, so it is the
+    // one a script would target first.
+    await consume(ctx, "emergency", userId);
+    const svc = await priceService(ctx, args.serviceId);
+    if (!svc) throw new Error("Unknown service");
+    if (!args.address.trim()) throw new Error("Address is required");
+
+    const workerShare = Math.round(svc.base * WORKER_SHARE_RATE);
+    const welfareAmt = Math.round(svc.base * WELFARE_RATE);
+    const opsAmt = svc.base - workerShare - welfareAmt;
+
+    const bookingId = await ctx.db.insert("bookings", {
+      customerId: userId,
+      serviceId: args.serviceId,
+      customServiceId: svc.customServiceId,
+      trade: svc.trade,
+      serviceName: svc.name,
+      address: args.address.trim(),
+      lat: args.lat,
+      lng: args.lng,
+      // Pinned to the top of every matching worker's radar.
+      scheduledFor: Date.now(),
+      urgent: true,
+      emergency: true,
+      notes: args.notes?.trim() || undefined,
+      welfareOptIn: true,
+      base: svc.base,
+      hourly: svc.hourly,
+      welfareAmt,
+      opsAmt,
+      workerShare,
+      total: svc.base,
+      status: "pending",
+      createdAt: Date.now(),
+    });
+    return bookingId;
+  },
+});
+
+/* ── Safety Mode ──
+ * A customer preference, not an identity claim. It changes two things: which
+ * workers a customer is shown, and whether the worker can see the customer's
+ * address before they set off.
+ */
+
+export const setSafetyMode = mutation({
+  args: { enabled: v.boolean() },
+  handler: async (ctx, args) => {
+    const userId = await requireUser(ctx);
+    await consume(ctx, "safety", userId);
+    await ctx.db.patch(userId, { safetyMode: args.enabled });
+  },
+});
+
+/** Whether the signed-in customer has Safety Mode on. Defaults to off. */
+export const mySafetyMode = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (userId === null) return false;
+    const user = await ctx.db.get(userId);
+    return user?.safetyMode === true;
   },
 });
 
