@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { LANGS } from "@/lib/i18n";
+import { LANGS, initBnGateway } from "@/lib/i18n";
 
 /**
  * Guards against the two most common i18n defects in this project:
@@ -221,6 +221,15 @@ describe("i18n dictionary integrity", () => {
   });
 
   describe("locale coverage", () => {
+    it("initBnGateway runs without a missing import and fills the side keys", () => {
+      // main.tsx calls this at startup, before the first render, so a reference
+      // to a module that is not actually imported throws a blank screen rather
+      // than a failing assertion. Exercise it here instead.
+      expect(() => initBnGateway()).not.toThrow();
+      // The Bengali keys that only exist in the side module must be live after
+      // the merge, not just present on disk.
+      expect(effectiveKeys("bn").has("gw_op_badge")).toBe(true);
+    });
     for (const lang of LANGS) {
       if (lang.code === "en") continue;
       it(`${lang.label} (${lang.code}) translates every key the app actually shows`, () => {
