@@ -1,0 +1,1 @@
+const o=["morning","afternoon","evening"];function a(e,t){return e*o.length+o.indexOf(t)}function i(e,t,n){return e?(e&1<<a(t,n))!==0:!1}function s(e=new Date){return Array.from({length:7},(t,n)=>{const r=new Date(e);return r.setDate(r.getDate()+n),{offset:n,label:r.toLocaleDateString("en-IN",{weekday:"short",day:"numeric"})}})}export{o as S,i,s as u};
