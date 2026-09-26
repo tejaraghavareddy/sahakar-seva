@@ -105,6 +105,27 @@ export function inSocietyScope(
   return (a) => a.societyId === id;
 }
 
+/**
+ * Is a booking within this officer's scope?
+ *
+ * A job only belongs to a federation once a worker is assigned. Until then it
+ * sits in the shared dispatch pool that every federation's workers accept
+ * from, so it is deliberately visible to every federation admin — that pool is
+ * the marketplace, not one society's private work. After assignment the job
+ * follows the worker, and therefore their federation.
+ */
+export async function bookingInScope(
+  ctx: QueryCtx | MutationCtx,
+  b: { workerId?: Id<"artisans"> | null },
+  scope: "all" | Id<"societies"> | null,
+): Promise<boolean> {
+  if (scope === "all" || scope === null) return true;
+  if (!b.workerId) return true; // unassigned: shared pool
+  const artisan = await ctx.db.get(b.workerId);
+  if (!artisan) return true; // dangling worker reference: attributable to nobody
+  return artisan.societyId === scope;
+}
+
 /** Throw unless the caller is a federation officer. */
 export async function requireAdmin(ctx: QueryCtx | MutationCtx) {
   const userId = await requireUser(ctx);

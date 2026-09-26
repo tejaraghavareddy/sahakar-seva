@@ -1,6 +1,6 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { query, mutation } from "./_generated/server";
-import { isAdminUser, requireUser } from "./identity";
+import { isAdminUser, requireUser, adminSocietyScope, bookingInScope } from "./identity";
 import { consume } from "./rateLimit";
 import { v } from "convex/values";
 
@@ -47,7 +47,15 @@ export const listForAdmin = query({
   handler: async (ctx) => {
     const userId = await requireUser(ctx);
     if (!(await isAdminUser(ctx, userId))) throw new Error("Forbidden");
-    return await ctx.db.query("disputes").order("desc").take(200);
+    const scope = await adminSocietyScope(ctx, userId);
+    const all = await ctx.db.query("disputes").order("desc").take(200);
+    // A dispute follows the job it is about, and the job follows the worker.
+    const out = [];
+    for (const d of all) {
+      const b = await ctx.db.get(d.bookingId);
+      if (await bookingInScope(ctx, b ?? { workerId: null }, scope)) out.push(d);
+    }
+    return out;
   },
 });
 
@@ -84,6 +92,17 @@ export const resolve = mutation({
     if (!dispute) throw new Error("Dispute not found");
     if (dispute.status !== "open") {
       throw new Error("This dispute has already been arbitrated");
+    }
+    // Arbitration (and blacklisting) is a federation-level act.
+    const disputedBooking = await ctx.db.get(dispute.bookingId);
+    if (
+      !(await bookingInScope(
+        ctx,
+        disputedBooking ?? { workerId: null },
+        await adminSocietyScope(ctx, userId),
+      ))
+    ) {
+      throw new Error("Not in your federation");
     }
     await ctx.db.patch(args.id, {
       status: args.status,

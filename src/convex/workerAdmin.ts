@@ -1,6 +1,11 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { query, mutation, MutationCtx } from "./_generated/server";
-import { requireAdmin, requireUser } from "./identity";
+import {
+  requireAdmin,
+  requireUser,
+  adminSocietyScope,
+  inSocietyScope,
+} from "./identity";
 import { Id } from "./_generated/dataModel";
 import { v } from "convex/values";
 
@@ -42,11 +47,21 @@ export const addWorker = mutation({
     dailyRate: v.number(),
   },
   handler: async (ctx, args) => {
-    await requireAdmin(ctx);
+    const adminId = await requireAdmin(ctx);
 
     const user = await ctx.db.get(args.userId);
     if (!user) throw new Error("Member account not found");
     if (user.isAnonymous) throw new Error("Cannot add a guest session as a worker");
+
+    // A scoped federation admin may only enroll workers into their OWN
+    // federation, whatever society id the request names.
+    const scope = await adminSocietyScope(ctx, adminId);
+    if (scope !== "all" && scope !== null) {
+      if (args.societyId && args.societyId !== scope) {
+        throw new Error("You can only add workers to your own federation");
+      }
+      args.societyId = scope;
+    }
 
     const existing = await ctx.db
       .query("artisans")
@@ -127,6 +142,11 @@ export const removeWorker = mutation({
     const artisan = await ctx.db.get(args.artisanId);
     if (!artisan) throw new Error("Worker not found");
     if (artisan.removedAt) throw new Error("Worker is already removed");
+    // Removal takes a worker off the whole dispatch radar, so a scoped
+    // federation admin may only remove their own federation's members.
+    if (!inSocietyScope(await adminSocietyScope(ctx, adminId))(artisan)) {
+      throw new Error("Not in your federation");
+    }
 
     const now = Date.now();
     const note = args.note?.trim() || "Removed by federation board";

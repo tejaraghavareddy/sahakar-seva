@@ -1,5 +1,10 @@
 import { query, mutation, MutationCtx } from "./_generated/server";
-import { isAdminUser, requireUser } from "./identity";
+import {
+  adminSocietyScope,
+  inSocietyScope,
+  isAdminUser,
+  requireUser,
+} from "./identity";
 import { Id } from "./_generated/dataModel";
 import { v } from "convex/values";
 import type { Doc } from "./_generated/dataModel";
@@ -145,8 +150,17 @@ export const reviewQueue = query({
     const artisans = await ctx.db.query("artisans").collect();
     for (const a of artisans) artisanCache.set(a._id, a);
 
+    // A federation admin verifies only their own federation's workers.
+    const scope = await adminSocietyScope(ctx, adminId);
+    const inScope = inSocietyScope(scope);
+
     const out = await Promise.all(
-      rows.map(async (r) => {
+      rows
+        .filter((r) => {
+          const artisan = artisanCache.get(r.artisanId);
+          return artisan ? inScope(artisan) : false;
+        })
+        .map(async (r) => {
         const artisan = artisanCache.get(r.artisanId);
         return {
           _id: r._id,
@@ -198,6 +212,11 @@ export const reviewSample = mutation({
 
     const artisan = await ctx.db.get(sample.artisanId);
     if (!artisan) throw new Error("Worker profile not found");
+    // Verification is a federation-level act: a scoped admin cannot issue
+    // another federation's trade credential.
+    if (!inSocietyScope(await adminSocietyScope(ctx, adminId))(artisan)) {
+      throw new Error("Not in your federation");
+    }
 
     const now = Date.now();
 
@@ -287,6 +306,9 @@ export const reviewKycFromSkillTab = mutation({
 
     const artisan = await ctx.db.get(args.artisanId);
     if (!artisan) throw new Error("Worker not found");
+    if (!inSocietyScope(await adminSocietyScope(ctx, adminId))(artisan)) {
+      throw new Error("Not in your federation");
+    }
     if (artisan.kycStatus !== "pending") throw new Error("KYC is not pending");
 
     const now = Date.now();

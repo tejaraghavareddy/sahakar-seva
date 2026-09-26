@@ -9,7 +9,7 @@
  * the customer catalog.
  */
 import { query, mutation, QueryCtx, MutationCtx } from "./_generated/server";
-import { isAdminUser, requireUser } from "./identity";
+import { isAdminUser, requireUser, adminSocietyScope, inSocietyScope } from "./identity";
 import { consume } from "./rateLimit";
 import { Id } from "./_generated/dataModel";
 import { v } from "convex/values";
@@ -290,8 +290,11 @@ export const reviewQueue = query({
       .collect();
 
     const out = [];
+    // A federation admin reviews only their own federation's listings.
+    const inScope = inSocietyScope(await adminSocietyScope(ctx, adminId));
     for (const r of rows) {
       const artisan = await ctx.db.get(r.artisanId);
+      if (!artisan || !inScope(artisan)) continue;
       out.push({
         _id: r._id,
         name: r.name,
@@ -328,6 +331,12 @@ export const review = mutation({
     const row = await ctx.db.get(args.serviceId);
     if (!row) throw new Error("Listing not found");
     if (row.status !== "pending") throw new Error("Listing already reviewed");
+    // A listing belongs to the worker who wrote it, so it belongs to their
+    // federation: a scoped admin cannot publish another society's work.
+    const owner = await ctx.db.get(row.artisanId);
+    if (!owner || !inSocietyScope(await adminSocietyScope(ctx, adminId))(owner)) {
+      throw new Error("Not in your federation");
+    }
 
     const now = Date.now();
     await ctx.db.patch(args.serviceId, {

@@ -1,5 +1,6 @@
-import { query, mutation, QueryCtx } from "./_generated/server";
-import { isAdminUser, requireUser } from "./identity";
+import { query, mutation, QueryCtx, MutationCtx } from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
+import { isAdminUser, requireUser, adminSocietyScope } from "./identity";
 import { v } from "convex/values";
 
 /** ISO-3166 style state code used to compose society registration codes. */
@@ -63,7 +64,14 @@ export const listForAdmin = query({
   handler: async (ctx) => {
     const userId = await requireUser(ctx);
     if (!(await isAdminUser(ctx, userId))) throw new Error("Forbidden");
-    const societies = await ctx.db.query("societies").order("desc").take(200);
+    const scope = await adminSocietyScope(ctx, userId);
+    const all = await ctx.db.query("societies").order("desc").take(200);
+    // A federation admin sees their own society; platform-tier officers (super
+    // admin, the owner, the demo accounts) see the whole network.
+    const societies =
+      scope === "all" || scope === null
+        ? all
+        : all.filter((s) => s._id === scope);
     const artisans = await ctx.db.query("artisans").collect();
     const counts: Record<string, number> = {};
     for (const a of artisans) {
@@ -72,6 +80,21 @@ export const listForAdmin = query({
     return societies.map((s) => ({ ...s, memberCount: counts[s._id] ?? 0 }));
   },
 });
+
+/**
+ * Chartering a new society is platform governance, not federation work: a
+ * federation admin who has been scoped to one society (see adminSocietyScope)
+ * must not be able to create societies, nor review, activate or suspend them.
+ * Platform-tier officers pass, as do officers nobody has scoped yet — those
+ * keep the legacy whole-network view until a super admin assigns them a
+ * federation, which is the same rule every other scoped read follows.
+ */
+async function requirePlatformTier(ctx: QueryCtx | MutationCtx, userId: Id<"users">) {
+  const scope = await adminSocietyScope(ctx, userId);
+  if (scope !== "all" && scope !== null) {
+    throw new Error("Only platform officers can manage federations");
+  }
+}
 
 /** Register a new district cooperative society (enters the pipeline as pending). */
 export const register = mutation({
@@ -88,6 +111,7 @@ export const register = mutation({
   handler: async (ctx, args) => {
     const userId = await requireUser(ctx);
     if (!(await isAdminUser(ctx, userId))) throw new Error("Forbidden");
+    await requirePlatformTier(ctx, userId);
     if (!args.name.trim()) throw new Error("Society name is required");
     if (!args.district.trim()) throw new Error("District is required");
     if (!args.state.trim()) throw new Error("State is required");
@@ -122,6 +146,7 @@ export const review = mutation({
   handler: async (ctx, args) => {
     const userId = await requireUser(ctx);
     if (!(await isAdminUser(ctx, userId))) throw new Error("Forbidden");
+    await requirePlatformTier(ctx, userId);
     const society = await ctx.db.get(args.id);
     if (!society) throw new Error("Society not found");
     if (!["active", "suspended", "rejected", "pending"].includes(args.status)) {

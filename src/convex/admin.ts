@@ -5,6 +5,7 @@ import { v } from "convex/values";
 import {
   DEMO_ADMIN_EMAILS,
   adminSocietyScope,
+  bookingInScope,
   inSocietyScope,
   isAdminUser,
   requireUser,
@@ -100,12 +101,14 @@ export const earningsLedger = query({
       .collect();
 
     const per: Record<string, { name: string; trade: string; jobs: number; earnings: number; welfare: number }> = {};
+    const scope = await adminSocietyScope(ctx, userId);
     // A shared visit is one job split across households, and every participant
     // row carries the same visit-level amounts. Counting rows would report one
     // visit as N jobs worth N times the earnings, so each group is counted once.
     const countedGroups = new Set<string>();
     for (const b of bookings) {
       if (!b.workerId) continue;
+      if (!(await bookingInScope(ctx, b, scope))) continue;
       if (b.groupId) {
         if (countedGroups.has(b.groupId)) continue;
         countedGroups.add(b.groupId);
@@ -152,9 +155,13 @@ export const overview = query({
     // price once, so summing the per-row amounts would triple the federation's
     // reported revenue and welfare.
     const moneyCounted = new Set<string>();
+    const scope = await adminSocietyScope(ctx, userId);
     for (const b of bookings) {
       byStatus[b.status] = (byStatus[b.status] ?? 0) + 1;
       if (b.status === "settled" || b.status === "completed") {
+        // A federation admin's dashboard is their federation's ledger, not the
+        // whole platform's.
+        if (!(await bookingInScope(ctx, b, scope))) continue;
         if (b.groupId) {
           if (moneyCounted.has(b.groupId)) continue;
           moneyCounted.add(b.groupId);
@@ -170,7 +177,8 @@ export const overview = query({
     let online = 0;
     let verified = 0;
     let credentials = 0;
-    for (const a of artisans) {
+    // Worker counts are federation-scoped for the same reason the money is.
+    for (const a of artisans.filter(inSocietyScope(scope))) {
       byTrade[a.trade] = (byTrade[a.trade] ?? 0) + 1;
       if (a.isOnline) online += 1;
       if (a.kycStatus === "verified") verified += 1;
@@ -327,11 +335,15 @@ export const adminCancelBooking = mutation({
   args: { id: v.id("bookings") },
   handler: async (ctx, args) => {
     const userId = await requireUser(ctx);
-    if (!(await isAdminUser(ctx, userId))) throw new Error("Forbidden");
+    const scope = await scopedSociety(ctx, userId);
     const b = await ctx.db.get(args.id);
     if (!b) throw new Error("Booking not found");
     if (["completed", "settled", "cancelled"].includes(b.status)) {
       throw new Error("Booking already closed");
+    }
+    // A scoped federation admin may only cancel their own federation's work.
+    if (!(await bookingInScope(ctx, b, scope))) {
+      throw new Error("Not in your federation");
     }
     await audit(ctx, {
       actorId: userId,
