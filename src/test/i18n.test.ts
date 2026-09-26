@@ -2,6 +2,12 @@ import { describe, expect, it } from "vitest";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { LANGS, initBnGateway } from "@/lib/i18n";
+import {
+  SUPERADMIN_BN,
+  SUPERADMIN_HI,
+  SUPERADMIN_TA,
+  SUPERADMIN_TE,
+} from "@/lib/i18n.superadmin";
 
 /**
  * Guards against the two most common i18n defects in this project:
@@ -161,6 +167,10 @@ function effectiveKeys(lang: "en" | "hi" | "te" | "ta" | "bn"): Set<string> {
   if (lang === "te") for (const k of exportedKeys("i18n.gateway.ts", "GATEWAY_TE")) keys.add(k);
   if (lang === "ta") for (const k of exportedKeys("i18n.gateway.ts", "GATEWAY_TA")) keys.add(k);
   if (lang === "bn") for (const k of exportedKeys("i18n.gateway.ts", "GATEWAY_BN")) keys.add(k);
+  if (lang === "hi") for (const k of Object.keys(SUPERADMIN_HI)) keys.add(k);
+  if (lang === "te") for (const k of Object.keys(SUPERADMIN_TE)) keys.add(k);
+  if (lang === "ta") for (const k of Object.keys(SUPERADMIN_TA)) keys.add(k);
+  if (lang === "bn") for (const k of Object.keys(SUPERADMIN_BN)) keys.add(k);
   return keys;
 }
 
@@ -209,6 +219,10 @@ describe("i18n dictionary integrity", () => {
       ...exportedKeys("i18n.gateway.ts", "GATEWAY_TE"),
       ...exportedKeys("i18n.gateway.ts", "GATEWAY_TA"),
       ...exportedKeys("i18n.gateway.ts", "GATEWAY_BN"),
+      ...Object.keys(SUPERADMIN_HI),
+      ...Object.keys(SUPERADMIN_TE),
+      ...Object.keys(SUPERADMIN_TA),
+      ...Object.keys(SUPERADMIN_BN),
     ]);
     expect(side.size).toBeGreaterThan(50);
     const orphans = [...side].filter((k) => !isUsed(k) && !isRetired(k)).sort();

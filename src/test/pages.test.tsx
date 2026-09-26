@@ -18,6 +18,7 @@ import CustomerAuth from "@/pages/CustomerAuth";
 import Admin from "@/pages/Admin";
 import Welfare from "@/pages/Welfare";
 import WorkerProfile from "@/pages/WorkerProfile";
+import SuperAdmin from "@/pages/SuperAdmin";
 
 /** A booking id string; page code only compares identity, never validates it. */
 const BOOKING_ID = "kg2abc123def456ghijk789lmn01op";
@@ -305,6 +306,25 @@ describe("authenticated portals", () => {
     expect(document.body.textContent?.length ?? 0).toBeGreaterThan(80);
   });
 
+  it("renders the super-admin platform console", () => {
+    seedCommon();
+    queryResults.set("superAdmin:amSuperAdmin", true);
+    queryResults.set("superAdmin:platformOverview", {
+      federations: 2,
+      byStatus: { active: 2 },
+      federationAdmins: 1,
+      unscopedAdmins: 0,
+      workers: 12,
+      bookings: 40,
+      revenueSettled: 52000,
+      welfarePool: 3640,
+    });
+    queryResults.set("superAdmin:listFederations", []);
+    queryResults.set("superAdmin:listFederationAdmins", []);
+    renderPage(<SuperAdmin />, { route: "/super" });
+    expect(document.body.textContent?.length ?? 0).toBeGreaterThan(80);
+  });
+
   it("renders a worker's public profile", () => {
     seedCommon();
     queryResults.set("artisans:profile", {
@@ -351,6 +371,7 @@ describe("no raw translation keys leak into the UI", () => {
       "/workers/a1",
       "/workers/:id",
     ],
+    ["SuperAdmin", () => <SuperAdmin />, "/super"],
   ];
 
   for (const [name, make, route, path] of pages) {

@@ -7,12 +7,17 @@ export const ROLES = {
   ADMIN: "admin",
   USER: "user",
   MEMBER: "member",
+  // Sits above `admin`: manages federations and appoints/removes the
+  // federation admins themselves. Nothing in the federation console runs at
+  // this level — it is a platform governance tier, not an operations one.
+  SUPERADMIN: "superadmin",
 } as const;
 
 export const roleValidator = v.union(
   v.literal(ROLES.ADMIN),
   v.literal(ROLES.USER),
   v.literal(ROLES.MEMBER),
+  v.literal(ROLES.SUPERADMIN),
 );
 
 const schema = defineSchema(
@@ -29,6 +34,11 @@ const schema = defineSchema(
       isAnonymous: v.optional(v.boolean()), // is the user anonymous. do not remove
 
       role: v.optional(roleValidator), // role of the user. do not remove
+
+      // For federation admins: the one society (federation) whose workers they
+      // may govern. Absent for ordinary members and super admins, whose view
+      // spans every federation.
+      societyId: v.optional(v.id("societies")),
 
       // Safety Mode — a customer-side preference, not an identity claim. When on,
       // the customer only ever sees fully verified workers and their exact

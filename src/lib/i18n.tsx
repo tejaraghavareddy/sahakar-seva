@@ -29,6 +29,12 @@ import { SKILL_BN, SKILL_HI, SKILL_TA, SKILL_TE } from "./i18n.skill";
 import { PROFILE_TA } from "./i18n.profile";
 import { GATEWAY_BN, GATEWAY_TA, GATEWAY_TE } from "./i18n.gateway";
 import { GW_BN, PORTAL_BN } from "./i18n.bn-gw";
+import {
+  SUPERADMIN_BN,
+  SUPERADMIN_HI,
+  SUPERADMIN_TA,
+  SUPERADMIN_TE,
+} from "./i18n.superadmin";
 
 const en: Dict = {
   /* ── Demand outlook ── */
@@ -432,6 +438,34 @@ const en: Dict = {
   ld_admin_desc: "Officer clearance required. Oversee verification, GIS dispatch, welfare funds, and district societies.",
   ld_admin_cta: "Secure Officer Sign-In →",
   ld_footer_reg: "Official Cooperative Registry · Verified Skilled Artisans",
+
+  /* ── Super-admin portal ── */
+  sa_home: "Home",
+  sa_title: "Platform Governance",
+  sa_badge: "Super Admin",
+  sa_platform: "Platform overview",
+  sa_federations: "Federations",
+  sa_fed_admins: "Federation admins",
+  sa_workers: "Workers",
+  sa_revenue: "Settled revenue",
+  sa_welfare: "Welfare pool",
+  sa_bookings: "Bookings",
+  sa_fed_list: "Federations",
+  sa_new_fed: "Charter federation",
+  sa_fed_name: "Federation name",
+  sa_fed_district: "District",
+  sa_fed_state: "State",
+  sa_charter: "Charter",
+  sa_members: "workers",
+  sa_no_admins: "no admin appointed",
+  sa_suspend: "Suspend",
+  sa_reactivate: "Reactivate",
+  sa_admins: "Federation admins",
+  sa_appt_email: "Officer email to appoint",
+  sa_pick_fed: "Assign to federation…",
+  sa_appoint: "Appoint",
+  sa_unscoped: "no federation assigned",
+  sa_remove: "Remove access",
   wc_title: "My work listings",
   wc_sub:
     "Publish the work you actually do — inside one of the six cooperative trades, or in a category you name yourself. The board reviews every listing before customers can book it.",
@@ -488,6 +522,10 @@ export function initBnGateway() {
   Object.assign(te, GATEWAY_TE);
   Object.assign(ta, GATEWAY_TA);
   Object.assign(bn, GATEWAY_BN);
+  Object.assign(hi, SUPERADMIN_HI);
+  Object.assign(te, SUPERADMIN_TE);
+  Object.assign(ta, SUPERADMIN_TA);
+  Object.assign(bn, SUPERADMIN_BN);
 }
 
 const hi: Dict = {

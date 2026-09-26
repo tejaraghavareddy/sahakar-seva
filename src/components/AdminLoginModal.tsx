@@ -51,7 +51,7 @@ export default function AdminLoginModal({ open, onClose, onSuccess }: AdminLogin
     }
   }
 
-  /** One-click entry for the fixed demo officer (SIH judging / testing). */
+  /** One-click entry for the fixed demo federation officer. */
   async function handleDemoSignIn() {
     setBusy(true);
     setError(null);
@@ -60,6 +60,22 @@ export default function AdminLoginModal({ open, onClose, onSuccess }: AdminLogin
       fd.set("email", "demo.admin@sahakar.demo");
       fd.set("code", "000000");
       await signIn("demo-admin", fd);
+      onSuccess();
+    } catch {
+      setError("The demo account is unavailable on this deployment.");
+      setBusy(false);
+    }
+  }
+
+  /** One-click entry for the fixed demo SUPER admin (platform tier). */
+  async function handleDemoSuperSignIn() {
+    setBusy(true);
+    setError(null);
+    try {
+      const fd = new FormData();
+      fd.set("email", "super.admin@sahakar.demo");
+      fd.set("code", "000000");
+      await signIn("demo-superadmin", fd);
       onSuccess();
     } catch {
       setError("The demo account is unavailable on this deployment.");
@@ -184,6 +200,19 @@ export default function AdminLoginModal({ open, onClose, onSuccess }: AdminLogin
         )}
 
         <div className="rounded-b-3xl border-t border-slate-200 bg-slate-50 px-5 py-3">
+          <button
+            type="button"
+            onClick={() => void handleDemoSuperSignIn()}
+            disabled={busy || isLoading}
+            className="mb-2 flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-slate-400 bg-white px-4 py-2.5 text-xs font-bold text-slate-700 transition hover:border-emerald-500 hover:text-emerald-700 disabled:opacity-60"
+          >
+            {busy ? (
+              <Loader2 className="size-3.5 animate-spin" />
+            ) : (
+              <ShieldCheck className="size-3.5" />
+            )}
+            Sign in as demo super admin
+          </button>
           <button
             type="button"
             onClick={() => void handleDemoSignIn()}

@@ -4,9 +4,25 @@ import { Id } from "./_generated/dataModel";
 import { v } from "convex/values";
 import {
   DEMO_ADMIN_EMAILS,
+  adminSocietyScope,
+  inSocietyScope,
   isAdminUser,
   requireUser,
 } from "./identity";
+
+/**
+ * Resolve the caller's federation scope, or throw for non-officers.
+ * Every worker-row read/write in this module goes through here, so the
+ * "federation admins govern only their own federation" rule is applied in
+ * exactly one place.
+ */
+async function scopedSociety(
+  ctx: MutationCtx | Parameters<typeof requireUser>[0],
+  userId: Id<"users">,
+): Promise<"all" | Id<"societies"> | null> {
+  if (!(await isAdminUser(ctx, userId))) throw new Error("Forbidden");
+  return adminSocietyScope(ctx, userId);
+}
 
 /**
  * Re-exported so existing imports keep working. The rule itself now lives in
@@ -182,8 +198,10 @@ export const workerDirectory = query({
   args: {},
   handler: async (ctx) => {
     const userId = await requireUser(ctx);
-    if (!(await isAdminUser(ctx, userId))) throw new Error("Forbidden");
-    return await ctx.db.query("artisans").order("desc").take(200);
+    const scope = await scopedSociety(ctx, userId);
+    const rows = await ctx.db.query("artisans").order("desc").take(200);
+    // A federation admin governs one federation: only its workers appear.
+    return rows.filter(inSocietyScope(scope));
   },
 });
 
@@ -192,9 +210,9 @@ export const removedWorkers = query({
   args: {},
   handler: async (ctx) => {
     const userId = await requireUser(ctx);
-    if (!(await isAdminUser(ctx, userId))) throw new Error("Forbidden");
+    const scope = await scopedSociety(ctx, userId);
     const all = await ctx.db.query("artisans").order("desc").take(200);
-    return all.filter((a) => !!a.removedAt);
+    return all.filter((a) => !!a.removedAt).filter(inSocietyScope(scope));
   },
 });
 
@@ -208,23 +226,41 @@ export const memberList = query({
     const users = await ctx.db.query("users").order("desc").take(500);
     const artisanRows = await ctx.db.query("artisans").collect();
     const byUser = new Map(artisanRows.map((a) => [a.userId, a]));
+    // A scoped federation admin sees their own federation's members (workers
+    // plus their own officers' accounts); super admins see the platform.
+    const scope = await adminSocietyScope(ctx, userId);
+    const inScope = inSocietyScope(scope);
 
-    return users.map((u) => {
-      const artisan = byUser.get(u._id);
-      return {
-        _id: u._id,
-        email: u.email,
-        name: u.name,
-        role: u.role,
-        isAnonymous: u.isAnonymous ?? false,
-        createdAt: u._creationTime,
-        workerId: artisan?._id,
-        workerName: artisan?.fullName,
-        workerTrade: artisan?.trade,
-        workerDistrict: artisan?.district,
-        kycStatus: artisan?.kycStatus,
-      };
-    });
+    return users
+      .filter((u) => {
+        const artisan = byUser.get(u._id);
+        if (artisan) return inScope(artisan);
+        // Non-worker accounts: fully visible to platform-level callers (and
+        // to unscoped officers, who keep the legacy global view until a super
+        // admin scopes them). A scoped federation admin sees only their own
+        // federation's officer accounts.
+        if (scope === "all" || scope === null) return true;
+        if (u.role === "admin" || u.role === "superadmin") {
+          return u.societyId === scope;
+        }
+        return false;
+      })
+      .map((u) => {
+        const artisan = byUser.get(u._id);
+        return {
+          _id: u._id,
+          email: u.email,
+          name: u.name,
+          role: u.role,
+          isAnonymous: u.isAnonymous ?? false,
+          createdAt: u._creationTime,
+          workerId: artisan?._id,
+          workerName: artisan?.fullName,
+          workerTrade: artisan?.trade,
+          workerDistrict: artisan?.district,
+          kycStatus: artisan?.kycStatus,
+        };
+      });
   },
 });
 
@@ -242,11 +278,12 @@ export const verificationQueue = query({
   args: {},
   handler: async (ctx) => {
     const userId = await requireUser(ctx);
-    if (!(await isAdminUser(ctx, userId))) throw new Error("Forbidden");
-    return await ctx.db
+    const scope = await scopedSociety(ctx, userId);
+    const rows = await ctx.db
       .query("artisans")
       .withIndex("by_kyc", (q) => q.eq("kycStatus", "pending"))
       .take(200);
+    return rows.filter(inSocietyScope(scope));
   },
 });
 
@@ -259,9 +296,11 @@ export const reviewKyc = mutation({
   },
   handler: async (ctx, args) => {
     const userId = await requireUser(ctx);
-    if (!(await isAdminUser(ctx, userId))) throw new Error("Forbidden");
+    const scope = await scopedSociety(ctx, userId);
     const artisan = await ctx.db.get(args.artisanId);
     if (!artisan) throw new Error("Artisan not found");
+    // A scoped federation admin can only review their own federation's workers.
+    if (!inSocietyScope(scope)(artisan)) throw new Error("Not in your federation");
     if (artisan.removedAt) throw new Error("This worker has been removed from the federation");
     if (artisan.kycStatus !== "pending") {
       throw new Error("This artisan's KYC is not pending review");

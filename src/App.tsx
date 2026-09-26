@@ -21,6 +21,8 @@ import { api } from "@/convex/_generated/api";
 import type { Doc } from "@/convex/_generated/dataModel";
 import { RequireAuth } from "@/components/RequireAuth";
 import RequireAdmin from "@/components/RequireAdmin";
+import RequireSuperAdmin from "@/components/RequireSuperAdmin";
+import SuperAdmin from "@/pages/SuperAdmin";
 import { useAuth } from "@/hooks/use-auth";
 
 /* ── Lazy route components (code-split portals) ─────────────── */
@@ -330,6 +332,18 @@ export default function App() {
                   <RequireAdmin>
                     <Admin />
                   </RequireAdmin>
+                </RequireAuth>
+              }
+            />
+
+            {/* Super-admin portal — platform governance tier */}
+            <Route
+              path="/super"
+              element={
+                <RequireAuth>
+                  <RequireSuperAdmin>
+                    <SuperAdmin />
+                  </RequireSuperAdmin>
                 </RequireAuth>
               }
             />

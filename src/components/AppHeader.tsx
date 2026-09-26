@@ -10,6 +10,7 @@ import {
   CalendarClock,
   HardHat,
   Home,
+  Landmark,
   LogOut,
   MapPin,
   RotateCcw,
@@ -22,6 +23,8 @@ export function AppHeader() {
   const navigate = useNavigate();
   // Admin link renders only for federation officers (owner email or admin role).
   const amAdmin = useQuery(api.admin.amAdmin, {}) === true;
+  // Platform-tier link renders only for super admins.
+  const amSuper = useQuery(api.superAdmin.amSuperAdmin, {}) === true;
   const { location, setManual } = useDetectedLocation();
   const [pickerOpen, setPickerOpen] = useState(false);
 
@@ -32,6 +35,7 @@ export function AppHeader() {
     ...(amAdmin
       ? [{ to: "/admin", label: "Admin", icon: ShieldCheck }]
       : []),
+    ...(amSuper ? [{ to: "/super", label: "Platform", icon: Landmark }] : []),
   ];
 
   return (

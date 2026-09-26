@@ -27,6 +27,13 @@ export const OWNER_EMAIL = "teja200822@gmail.com";
  */
 export const DEMO_ADMIN_EMAILS = ["demo.admin@sahakar.demo"];
 
+/**
+ * DEMO SUPER ADMIN — platform-tier demo account (same revocation story: delete
+ * the entry, then the user row). Sees every federation and manages the
+ * federation admins themselves.
+ */
+export const DEMO_SUPERADMIN_EMAILS = ["super.admin@sahakar.demo"];
+
 /** Throw unless there is a signed-in caller. Returns their user id. */
 export async function requireUser(ctx: QueryCtx | MutationCtx) {
   const userId = await getAuthUserId(ctx);
@@ -34,7 +41,7 @@ export async function requireUser(ctx: QueryCtx | MutationCtx) {
   return userId;
 }
 
-/** True when this user id belongs to a federation officer. */
+/** True when this user id belongs to a federation officer (any tier). */
 export async function isAdminUser(
   ctx: QueryCtx | MutationCtx,
   userId: Id<"users">,
@@ -43,7 +50,59 @@ export async function isAdminUser(
   if (!user) return false;
   if (user.email === OWNER_EMAIL) return true;
   if (DEMO_ADMIN_EMAILS.includes(user.email ?? "")) return true;
-  return user.role === "admin";
+  return user.role === "admin" || user.role === "superadmin";
+}
+
+/** True when this user id belongs to a platform-level super admin. */
+export async function isSuperAdmin(
+  ctx: QueryCtx | MutationCtx,
+  userId: Id<"users">,
+): Promise<boolean> {
+  const user = await ctx.db.get(userId);
+  if (!user) return false;
+  return user.role === "superadmin";
+}
+
+/**
+ * Which federation a federation admin governs.
+ *
+ * Returns:
+ *  - `"all"` — a super admin (or the owner): sees every federation;
+ *  - a societies document id — an admin scoped to exactly one federation via
+ *    `users.societyId`, set when a super admin appoints them;
+ *  - `null` — no scope (ordinary member, or an officer nobody has scoped yet).
+ *
+ * Every admin read/write that touches worker rows goes through this ONE
+ * function, so "federation admins see only their own workers" is enforced in
+ * a single place the whole console provably shares.
+ */
+export async function adminSocietyScope(
+  ctx: QueryCtx | MutationCtx,
+  userId: Id<"users">,
+): Promise<"all" | Id<"societies"> | null> {
+  const user = await ctx.db.get(userId);
+  if (!user) return null;
+  if (user.role === "superadmin") return "all";
+  // The owner and the demo accounts are platform-level by design: the owner
+  // built the whole federation network, and the demo accounts exist to show
+  // the full product to judges.
+  if (user.email === OWNER_EMAIL) return "all";
+  if (DEMO_ADMIN_EMAILS.includes(user.email ?? "")) return "all";
+  if (user.role === "admin") return user.societyId ?? null;
+  return null;
+}
+
+/**
+ * The test an admin-facing worker row must pass for this caller. Returns a
+ * predicate for `.filter()` over collected artisan rows, and also treats rows
+ * from unscoped officers as "in scope" (see the note at adminSocietyScope).
+ */
+export function inSocietyScope(
+  scope: "all" | Id<"societies"> | null,
+): (a: { societyId: string }) => boolean {
+  if (scope === "all" || scope === null) return () => true;
+  const id = scope as string;
+  return (a) => a.societyId === id;
 }
 
 /** Throw unless the caller is a federation officer. */
