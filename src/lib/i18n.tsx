@@ -25,9 +25,9 @@ const STORAGE_KEY = "sahakar.lang";
 /* ---------------- Dictionary ---------------- */
 
 type Dict = Record<string, string>;
-import { GW_BN, PORTAL_BN } from "./i18n.bn-gw";
 import { SKILL_BN, SKILL_HI, SKILL_TA, SKILL_TE } from "./i18n.skill";
 import { PROFILE_TA } from "./i18n.profile";
+import { GATEWAY_TE } from "./i18n.gateway";
 
 const en: Dict = {
   /* ── Demand outlook ── */
@@ -37,6 +37,11 @@ const en: Dict = {
   dl_normal: "Normal demand",
   dl_footnote:
     "A federation estimate from weather, the festival calendar and recent local work — not a promise of jobs.",
+
+  /* ── Verified gateway checkout ── */
+  bd_gw_pay: "Pay ₹{amount} securely",
+  bd_gw_note:
+    "Card, UPI or netbanking via Razorpay — the federation board gets a signed receipt; the UPI QR below still pays the worker directly.",
 
   /* ── Availability ── */
   av_title: "When you are available",
@@ -481,6 +486,10 @@ export function initBnGateway() {
 }
 
 const hi: Dict = {
+  /* ── Verified gateway checkout ── */
+  bd_gw_pay: "₹{amount} सुरक्षित रूप से चुकाएँ",
+  bd_gw_note:
+    "Razorpay के ज़रिए कार्ड, UPI या नेटबैंकिंग — फेडरेशन बोर्ड को साइन रसीद मिलती है; नीचे दिया UPI QR सीधे कारीगर को ही भुगतान करता है।",
   gw_op_badge: "संघ सक्रिय — डिस्पैच जारी",
   gw_eyebrow: "सहकारी स्वामित्व · संघ-संचालित",
   gw_title_a: "कारीगरों के लिए कारीगरों का संघ।",

@@ -150,6 +150,12 @@ const schema = defineSchema(
       workerVpa: v.optional(v.string()), // worker's own UPI id — funds go straight to them
       acceptedAt: v.optional(v.number()),
       utr: v.optional(v.string()), // UPI transaction reference
+      // Razorpay order + how the booking got paid. `paymentMethod` keeps the
+      // ledger honest: a UTR the customer typed is not the same kind of fact as
+      // a gateway signature verification, and the welfare accrual below treats
+      // them differently.
+      rpOrderId: v.optional(v.string()),
+      paymentMethod: v.optional(v.string()), // "gateway" | "upi_manual"
       paidAt: v.optional(v.number()),
       settledAt: v.optional(v.number()),
       cancelledAt: v.optional(v.number()),
