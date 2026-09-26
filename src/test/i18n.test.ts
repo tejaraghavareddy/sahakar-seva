@@ -176,6 +176,10 @@ function effectiveKeys(lang: "en" | "hi" | "te" | "ta" | "bn"): Set<string> {
   if (lang === "te") for (const k of Object.keys(EV_TE)) keys.add(k);
   if (lang === "ta") for (const k of Object.keys(EV_TA)) keys.add(k);
   if (lang === "bn") for (const k of Object.keys(EV_BN)) keys.add(k);
+  if (lang === "hi") for (const k of exportedKeys("i18n.wauth.ts", "WAUTH_HI")) keys.add(k);
+  if (lang === "te") for (const k of exportedKeys("i18n.wauth.ts", "WAUTH_TE")) keys.add(k);
+  if (lang === "ta") for (const k of exportedKeys("i18n.wauth.ts", "WAUTH_TA")) keys.add(k);
+  if (lang === "bn") for (const k of exportedKeys("i18n.wauth.ts", "WAUTH_BN")) keys.add(k);
   return keys;
 }
 

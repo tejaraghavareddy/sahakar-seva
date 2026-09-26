@@ -325,7 +325,7 @@ function CustomerAuth() {
             <div className="border-t border-slate-200 bg-slate-50 px-6 py-3.5 text-center text-xs text-slate-500">
               Are you an artisan?{" "}
               <Link
-                to="/auth?returnTo=/dashboard"
+                to="/login/worker"
                 className="font-bold text-emerald-700 underline underline-offset-2"
               >
                 Sign in as a worker →

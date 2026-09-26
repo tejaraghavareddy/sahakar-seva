@@ -29,6 +29,7 @@ import { SKILL_BN, SKILL_HI, SKILL_TA, SKILL_TE } from "./i18n.skill";
 import { PROFILE_TA } from "./i18n.profile";
 import { GATEWAY_BN, GATEWAY_TA, GATEWAY_TE } from "./i18n.gateway";
 import { GW_BN, PORTAL_BN } from "./i18n.bn-gw";
+import { WAUTH_BN, WAUTH_HI, WAUTH_TA, WAUTH_TE } from "./i18n.wauth";
 import {
   SUPERADMIN_BN,
   SUPERADMIN_HI,
@@ -244,6 +245,29 @@ const en: Dict = {
   auth_verifying: "verifying…",
   auth_sending: "sending…",
   auth_guest_error: "guest sign-in failed. try again.",
+
+  /* ── Worker portal sign-in (/login/worker) ── */
+  wauth_badge: "Worker Portal",
+  wauth_title: "Sign in to work",
+  wauth_sub: "Enter your mobile number and we will text you a one-time code.",
+  wauth_tab_phone: "Mobile",
+  wauth_tab_email: "Email",
+  wauth_phone_ph: "98765 43210",
+  wauth_phone_err: "Enter a valid 10-digit mobile number.",
+  wauth_send_sms: "text me a code",
+  wauth_sending_sms: "sending…",
+  wauth_sms_sent: "we texted a code to {phone}",
+  wauth_sms_desc: "Enter the 6-digit code we sent by SMS to {phone}.",
+  wauth_wrong_code: "That code is not correct. Please try again.",
+  wauth_switch_to_phone: "use my mobile number",
+  wauth_use_diff: "use a different number",
+  wauth_footnote:
+    "New here? Your trade credential and federation membership are completed after sign-in.",
+  wauth_customer_link: "Looking to book a worker?",
+  wauth_customer_cta: "Customer sign-in →",
+  wauth_benefit_payout: "90% of every job paid to you, direct to your UPI",
+  wauth_benefit_credential: "A digital trade credential your district trusts",
+  wauth_benefit_welfare: "Welfare and dividend credits on every settled job",
   secured: "secured by",
   ob_title: "artisan onboarding",
   ob_sub: "four gates. verified once, trusted everywhere.",
@@ -534,6 +558,10 @@ export function initBnGateway() {
   Object.assign(te, EV_TE);
   Object.assign(ta, EV_TA);
   Object.assign(bn, EV_BN);
+  Object.assign(hi, WAUTH_HI);
+  Object.assign(te, WAUTH_TE);
+  Object.assign(ta, WAUTH_TA);
+  Object.assign(bn, WAUTH_BN);
 }
 
 const hi: Dict = {

@@ -1,6 +1,7 @@
 import { mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { consume, otpSubject } from "./rateLimit";
+import { normalisePhone } from "./auth/phoneOtp";
 
 /**
  * Outbound sign-in-code throttle.
@@ -31,5 +32,30 @@ export const requestOtp = mutation({
     }
     await consume(ctx, "otp", otpSubject(email));
     return { ok: true };
+  },
+});
+
+/**
+ * Outbound sign-in-SMS throttle — the phone twin of `requestOtp`.
+ *
+ * An SMS costs real money per message and, unlike an email, it lands on a
+ * handset the caller may not own. Without this, one script could bill the
+ * cooperative for a flood of texts to an arbitrary mobile number.
+ *
+ * The number is normalised first so that "9876543210", "+919876543210" and
+ * "098765 43210" all spend the *same* budget. Without that, a caller would get
+ * a fresh allowance per spelling and the limit would be trivially bypassed.
+ *
+ * As with email, this is client-mediated: it raises cost and friction rather
+ * than being a hard server-side guarantee.
+ */
+export const requestPhoneOtp = mutation({
+  args: { phone: v.string() } ,
+  handler: async (ctx, args) => {
+    // Throws "Enter a valid mobile number." before any budget is spent, so a
+    // malformed number cannot be used to probe the limiter.
+    const phone = normalisePhone(args.phone);
+    await consume(ctx, "otp", otpSubject(`phone:${phone}`));
+    return { ok: true, phone };
   },
 });

@@ -1,4 +1,5 @@
 import { useAuth } from "@/hooks/use-auth";
+import { signInPathFor } from "@/lib/portal";
 import { Loader2 } from "lucide-react";
 import type { ReactNode } from "react";
 import { Navigate, useLocation } from "react-router";
@@ -17,9 +18,13 @@ export function RequireAuth({ children }: { children: ReactNode }) {
 
   if (!isAuthenticated) {
     const returnTo = `${location.pathname}${location.search}`;
+    // Send the visitor to the sign-in for the portal they were trying to
+    // reach, not always the generic one: a worker who deep-linked to
+    // /dashboard should not land on the customer booking screen.
+    const signIn = signInPathFor(location.pathname);
     return (
       <Navigate
-        to={`/auth?returnTo=${encodeURIComponent(returnTo)}`}
+        to={`${signIn}?returnTo=${encodeURIComponent(returnTo)}`}
         replace
       />
     );

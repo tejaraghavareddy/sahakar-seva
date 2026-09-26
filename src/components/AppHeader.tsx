@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router";
+import { Link, useLocation, useNavigate } from "react-router";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useAuth } from "@/hooks/use-auth";
 import { LanguagePicker } from "@/components/terminal";
 import LocationPickerModal from "@/components/map/LocationPickerModal";
 import { useDetectedLocation, formatAccuracy, isUnreliable } from "@/lib/useLocation";
+import { signInPathFor } from "@/lib/portal";
 import {
   CalendarClock,
   HardHat,
@@ -21,6 +22,11 @@ import {
 export function AppHeader() {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
+  // Named `route` because `location` below is the member's detected GPS fix.
+  const route = useLocation();
+  // The portal that owns the current page, so signing out returns a worker to
+  // the worker portal rather than dumping them in the customer catalog.
+  const portalSignIn = signInPathFor(route.pathname);
   // Admin link renders only for federation officers (owner email or admin role).
   const amAdmin = useQuery(api.admin.amAdmin, {}) === true;
   // Platform-tier link renders only for super admins.
@@ -119,7 +125,19 @@ export function AppHeader() {
           <LanguagePicker />
           <button
             type="button"
-            onClick={() => (user ? void signOut() : navigate("/auth?returnTo=/services"))}
+            onClick={() => {
+              if (user) {
+                // Wait for the session to actually end before navigating, or
+                // the guard would bounce the user straight back in.
+                void signOut().then(() => navigate(portalSignIn));
+              } else {
+                navigate(
+                  `${portalSignIn}?returnTo=${encodeURIComponent(
+                    route.pathname + route.search,
+                  )}`,
+                );
+              }
+            }}
             title={user ? "Sign out" : "Sign in"}
             className="flex size-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-50 hover:text-emerald-700"
           >

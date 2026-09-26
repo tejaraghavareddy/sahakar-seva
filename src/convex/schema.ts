@@ -31,6 +31,13 @@ const schema = defineSchema(
       image: v.optional(v.string()), // image of the user. do not remove
       email: v.optional(v.string()), // email of the user. do not remove
       emailVerificationTime: v.optional(v.number()), // email verification time. do not remove
+      // Phone identity. These are NOT in the override by accident: redefining
+      // `users` here replaces the whole table from `...authTables`, so omitting
+      // them drops the columns and the `by_phone` index that Convex Auth's
+      // `Phone` provider needs to look an account up. Gig workers sign in by
+      // phone, so both are load-bearing.
+      phone: v.optional(v.string()), // do not remove
+      phoneVerificationTime: v.optional(v.number()), // do not remove
       isAnonymous: v.optional(v.boolean()), // is the user anonymous. do not remove
 
       role: v.optional(roleValidator), // role of the user. do not remove
@@ -44,7 +51,9 @@ const schema = defineSchema(
       // the customer only ever sees fully verified workers and their exact
       // address stays hidden from the worker until they set off.
       safetyMode: v.optional(v.boolean()),
-    }).index("email", ["email"]), // index for the email. do not remove or modify
+    })
+      .index("email", ["email"]) // index for the email. do not remove or modify
+      .index("phone", ["phone"]), // index for the phone. do not remove or modify
 
     // add other tables here
 

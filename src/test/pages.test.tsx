@@ -1,8 +1,8 @@
 /** @vitest-environment jsdom */
 import { beforeEach, describe, expect, it } from "vitest";
-import { screen } from "@testing-library/react";
+import { fireEvent, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { queryResults, mutationErrors } from "./setup";
+import { queryResults, mutationErrors, mutationCalls } from "./setup";
 import { freshMocks, renderPage } from "./renderHarness";
 
 import Landing from "@/pages/Landing";
@@ -16,6 +16,7 @@ import Dashboard from "@/pages/Dashboard";
 import Onboarding from "@/pages/Onboarding";
 import Auth from "@/pages/Auth";
 import CustomerAuth from "@/pages/CustomerAuth";
+import WorkerAuth from "@/pages/WorkerAuth";
 import Admin from "@/pages/Admin";
 import Welfare from "@/pages/Welfare";
 import WorkerProfile from "@/pages/WorkerProfile";
@@ -182,6 +183,40 @@ describe("auth pages", () => {
     seedCommon();
     renderPage(<CustomerAuth />, { route: "/customer-auth" });
     expect(screen.getAllByRole("textbox").length).toBeGreaterThan(0);
+  });
+
+  it("renders worker sign-in on the mobile tab by default", () => {
+    seedCommon();
+    renderPage(<WorkerAuth />, { route: "/login/worker" });
+    // The phone is the primary identifier for a worker, so the SMS field must
+    // be the one on screen without a click.
+    const phone = document.querySelector('input[name="phone"]');
+    expect(phone).not.toBeNull();
+    expect(document.querySelector('input[name="email"]')).toBeNull();
+  });
+
+  it("offers email as a second tab on the worker sign-in", () => {
+    seedCommon();
+    renderPage(<WorkerAuth />, { route: "/login/worker" });
+    const emailTab = screen.getByRole("button", { name: /email/i });
+    fireEvent.click(emailTab);
+    expect(document.querySelector('input[name="email"]')).not.toBeNull();
+    expect(document.querySelector('input[name="phone"]')).toBeNull();
+  });
+
+  it("refuses a malformed worker number without spending an SMS", () => {
+    seedCommon();
+    renderPage(<WorkerAuth />, { route: "/login/worker" });
+    const phone = document.querySelector(
+      'input[name="phone"]',
+    ) as HTMLInputElement;
+    fireEvent.change(phone, { target: { value: "123" } });
+    fireEvent.click(screen.getByRole("button", { name: /text me a code/i }));
+    // No requestPhoneOtp call may be made for a number that cannot be sent to.
+    const smsCalls = mutationCalls.filter(
+      (c) => c.path === "authThrottle:requestPhoneOtp",
+    );
+    expect(smsCalls).toHaveLength(0);
   });
 });
 
